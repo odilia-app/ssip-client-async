@@ -1,8 +1,17 @@
+// ssip-client -- Speech Dispatcher client in Rust
+// Copyright (c) 2021 Laurent Pelecq
+//
+// Licensed under the Apache License, Version 2.0
+// <LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
+// license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. All files in the project carrying such notice may not be copied,
+// modified, or distributed except according to those terms.
+
 use std::fmt;
 use std::io::{self, Read, Write};
 use thiserror::Error as ThisError;
 
-pub type ReturnCode = u16;
+use crate::constants::{ReturnCode, OK_RECEIVING_DATA};
 
 /// Command status line
 ///
@@ -58,7 +67,7 @@ impl<S: Read + Write> Client<S> {
         component: &str,
     ) -> ClientResult<Self> {
         // https://stackoverflow.com/questions/58467659/how-to-store-tcpstream-with-bufreader-and-bufwriter-in-a-data-structure
-        execute_command!(
+        send_line!(
             &mut input,
             &mut output,
             "SET self CLIENT_NAME {}:{}:{}",
@@ -69,8 +78,26 @@ impl<S: Read + Write> Client<S> {
         Ok(Self { input, output })
     }
 
+    /// Send text to server
+    pub fn speak(&mut self, lines: &[&str]) -> ClientStatus {
+        let status = send_line!(&mut self.input, &mut self.output, "SPEAK")?;
+        if status.code == OK_RECEIVING_DATA {
+            const END_OF_DATA: [&str; 1] = ["."];
+            crate::protocol::write_lines(&mut self.output, lines)?;
+            send_lines!(&mut self.input, &mut self.output, &END_OF_DATA)
+        } else {
+            Ok(status)
+        }
+    }
+
+    /// Send a single line to the server
+    pub fn speak1(&mut self, line: &str) -> ClientStatus {
+        let lines: [&str; 1] = [line];
+        self.speak(&lines)
+    }
+
     /// Close the connection
     pub fn quit(&mut self) -> ClientStatus {
-        execute_command!(&mut self.input, &mut self.output, "QUIT")
+        send_line!(&mut self.input, &mut self.output, "QUIT")
     }
 }

@@ -13,4 +13,3 @@ thiserror = "1"
 
 [dev-dependencies]
 libc = "0"
-tempfile = "3"

@@ -1,3 +1,12 @@
+// ssip-client -- Speech Dispatcher client in Rust
+// Copyright (c) 2021 Laurent Pelecq
+//
+// Licensed under the Apache License, Version 2.0
+// <LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
+// license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. All files in the project carrying such notice may not be copied,
+// modified, or distributed except according to those terms.
+
 use std::io::{self, BufRead, Write};
 
 use crate::client::{ClientError, ClientResult, ClientStatus, StatusLine};
@@ -11,31 +20,32 @@ macro_rules! invalid_input {
     };
 }
 
-macro_rules! send_command {
-    ($output:expr, $cmd:expr) => {
-        crate::protocol::send_command($output, $cmd)
-    };
-    ($output:expr, $fmt:expr, $($arg:tt)*) => {
-        crate::protocol::send_command($output, format!($fmt, $($arg)*).as_str())
+macro_rules! send_lines {
+    ($input:expr, $output:expr, $lines:expr) => {
+        crate::protocol::send_lines($output, $lines)
+            .and_then(|()| crate::protocol::receive_answer($input, None))
     };
 }
 
-macro_rules! execute_command {
-    ($input:expr, $output:expr, $cmd:expr) => {
-        send_command!($output, $cmd)
-            .and_then(|()|
-                      crate::protocol::receive_answer($input, None))
+macro_rules! send_line {
+    ($input:expr, $output:expr, $line:expr) => {
+        send_lines!($input, $output, &[$line])
     };
     ($input:expr, $output:expr, $fmt:expr, $($arg:tt)*) => {
-        send_command!($output, $fmt, $($arg)*)
-            .and_then(|()|
-                      crate::protocol::receive_answer($input, None))
+        send_line!($input, $output, format!($fmt, $($arg)*).as_str())
     };
 }
 
-pub(crate) fn send_command(output: &mut dyn Write, command: &str) -> ClientResult<()> {
-    output.write_all(command.as_bytes())?;
-    output.write_all(b"\r\n")?;
+pub(crate) fn write_lines(output: &mut dyn Write, lines: &[&str]) -> ClientResult<()> {
+    for line in lines.iter() {
+        output.write_all(line.as_bytes())?;
+        output.write_all(b"\r\n")?;
+    }
+    Ok(())
+}
+
+pub(crate) fn send_lines(output: &mut dyn Write, lines: &[&str]) -> ClientResult<()> {
+    write_lines(output, lines)?;
     output.flush()?;
     Ok(())
 }
@@ -79,7 +89,7 @@ pub(crate) fn receive_answer(
                     return Err(invalid_input!("expecting space or dash, got {}.", ch));
                 }
             },
-            None => return Err(invalid_input!("line too short")),
+            None => return Err(invalid_input!("line too short: {}", line)),
         }
     }
 }
