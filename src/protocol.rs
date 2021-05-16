@@ -40,28 +40,21 @@ pub(crate) fn send_command(output: &mut dyn Write, command: &str) -> ClientResul
     Ok(())
 }
 
+/// Strip prefix if found
+fn strip_prefix(line: &str, prefix: &str) -> String {
+    line.strip_prefix(prefix).unwrap_or(line).to_string()
+}
+
 /// Parse the status line "OK msg" or "ERR msg"
 fn parse_status_line(code: u16, line: &str) -> ClientStatus {
-    const TOKEN_OK: &str = "OK ";
-    const OFFSET_OK: usize = TOKEN_OK.len();
-    const TOKEN_ERR: &str = "ERR ";
-    const OFFSET_ERR: usize = TOKEN_ERR.len();
-    if line.starts_with(TOKEN_OK) {
-        let message = line[OFFSET_OK..].to_string();
-        Ok(StatusLine { code, message })
-    } else if line.starts_with(TOKEN_ERR) {
-        let message = line[OFFSET_ERR..].to_string();
+    if (300..700).contains(&code) {
+        const TOKEN_ERR: &str = "ERR ";
+        let message = strip_prefix(line, TOKEN_ERR);
         Err(ClientError::Ssip(StatusLine { code, message }))
     } else {
-        let status = StatusLine {
-            code,
-            message: line.to_string(),
-        };
-        if (300..700).contains(&code) {
-            Err(ClientError::Ssip(status))
-        } else {
-            Ok(status)
-        }
+        const TOKEN_OK: &str = "OK ";
+        let message = strip_prefix(line, TOKEN_OK);
+        Ok(StatusLine { code, message })
     }
 }
 

@@ -11,3 +11,6 @@ description = "Client API for Speech Dispatcher"
 dirs = "3"
 thiserror = "1"
 
+[dev-dependencies]
+libc = "0"
+tempfile = "3"
