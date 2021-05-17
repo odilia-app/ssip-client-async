@@ -25,6 +25,10 @@ macro_rules! send_lines {
         crate::protocol::send_lines($output, $lines)
             .and_then(|()| crate::protocol::receive_answer($input, None))
     };
+    ($input:expr, $output:expr, $lines:expr, $out:expr) => {
+        crate::protocol::send_lines($output, $lines)
+            .and_then(|()| crate::protocol::receive_answer($input, Some($out)))
+    };
 }
 
 macro_rules! send_line {

@@ -53,6 +53,19 @@ pub type ClientResult<T> = Result<T, ClientError>;
 /// Client result consisting in a single status line
 pub type ClientStatus = ClientResult<StatusLine>;
 
+/// Message identifier
+pub type MessageId = String;
+
+macro_rules! client_method {
+    ($name:ident, $doc:expr, $line:expr) => {
+        #[doc=$doc]
+        pub fn $name(&mut self) -> ClientStatus {
+            send_line!(&mut self.input, &mut self.output, $line)
+        }
+    };
+}
+
+/// SSIP client on generic stream
 pub struct Client<S: Read + Write> {
     input: io::BufReader<S>,
     output: io::BufWriter<S>,
@@ -79,25 +92,24 @@ impl<S: Read + Write> Client<S> {
     }
 
     /// Send text to server
-    pub fn speak(&mut self, lines: &[&str]) -> ClientStatus {
+    pub fn speak(&mut self, lines: &[&str]) -> ClientResult<MessageId> {
         let status = send_line!(&mut self.input, &mut self.output, "SPEAK")?;
         if status.code == OK_RECEIVING_DATA {
             const END_OF_DATA: [&str; 1] = ["."];
             crate::protocol::write_lines(&mut self.output, lines)?;
-            send_lines!(&mut self.input, &mut self.output, &END_OF_DATA)
+            let mut answer = Vec::new();
+            send_lines!(&mut self.input, &mut self.output, &END_OF_DATA, &mut answer)
+                .map(|_| answer[0].to_string())
         } else {
-            Ok(status)
+            Err(ClientError::Ssip(status))
         }
     }
 
     /// Send a single line to the server
-    pub fn speak1(&mut self, line: &str) -> ClientStatus {
+    pub fn speak1(&mut self, line: &str) -> ClientResult<MessageId> {
         let lines: [&str; 1] = [line];
         self.speak(&lines)
     }
 
-    /// Close the connection
-    pub fn quit(&mut self) -> ClientStatus {
-        send_line!(&mut self.input, &mut self.output, "QUIT")
-    }
+    client_method!(quit, "Close the connection", "QUIT");
 }

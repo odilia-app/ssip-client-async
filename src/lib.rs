@@ -7,6 +7,13 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
+//! # SSIP client
+//!
+//! `ssip-client` implements a Speech Dispatcher SSIP client library in
+//! pure rust.
+//!
+//! See `Client` API for details.
+
 #[macro_use]
 mod protocol;
 
@@ -14,6 +21,6 @@ mod client;
 mod constants;
 mod unix;
 
-pub use client::{ClientResult, ClientStatus};
+pub use client::{Client, ClientResult, ClientStatus, StatusLine};
 pub use constants::*;
 pub use unix::new_client as new_unix_client;

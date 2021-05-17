@@ -30,6 +30,7 @@ fn speech_dispatcher_socket() -> io::Result<PathBuf> {
     }
 }
 
+/// Create a pair of FIFO reader and writer
 fn new_pair<P>(
     socket_path: P,
     read_timeout: Option<Duration>,
@@ -42,6 +43,7 @@ where
     Ok((BufReader::new(stream.try_clone()?), BufWriter::new(stream)))
 }
 
+/// New UNIX FIFO client
 pub fn new_client(
     user: &str,
     application: &str,
@@ -176,13 +178,13 @@ mod tests {
             &[
                 SET_CLIENT_COMMUNICATION,
                 (&["SPEAK\r\n"], "230 OK RECEIVING DATA\r\n"),
-                (&["Hello, world\r\n", ".\r\n"], "225 OK MESSAGE QUEUED\r\n"),
+                (
+                    &["Hello, world\r\n", ".\r\n"],
+                    "225-21\r\n225 OK MESSAGE QUEUED\r\n",
+                ),
             ],
             |client| {
-                assert_eq!(
-                    OK_MESSAGE_QUEUED,
-                    client.speak1("Hello, world").unwrap().code,
-                );
+                assert_eq!("21", client.speak1("Hello, world").unwrap(),);
                 Ok(())
             },
         )
