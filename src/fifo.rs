@@ -74,3 +74,17 @@ pub fn new_default_client(
         read_timeout,
     )
 }
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn test_speech_dispatcher_socket() -> std::io::Result<()> {
+        let socket_path = super::speech_dispatcher_socket()?;
+        assert!(socket_path
+            .to_str()
+            .unwrap()
+            .ends_with("/speech-dispatcher/speechd.sock"));
+        Ok(())
+    }
+}
