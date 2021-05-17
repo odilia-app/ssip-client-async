@@ -11,6 +11,8 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 dirs = "3"
 thiserror = "1"
+strum = "0.20"
+strum_macros = "0.20"
 
 [dev-dependencies]
 libc = "0"

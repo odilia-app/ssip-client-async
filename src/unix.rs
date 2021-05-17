@@ -173,7 +173,7 @@ mod tests {
     }
 
     #[test]
-    fn speak_one_line() -> io::Result<()> {
+    fn say_one_line() -> io::Result<()> {
         test_client(
             &[
                 SET_CLIENT_COMMUNICATION,
@@ -184,7 +184,7 @@ mod tests {
                 ),
             ],
             |client| {
-                assert_eq!("21", client.speak1("Hello, world").unwrap(),);
+                assert_eq!("21", client.say_line("Hello, world").unwrap(),);
                 Ok(())
             },
         )

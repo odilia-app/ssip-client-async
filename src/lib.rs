@@ -17,7 +17,7 @@
 //! Example
 //! ```no_run
 //! let mut client = ssip_client::new_unix_client("joe", "hello", "main")?;
-//! let msg_id = client.speak1("hello")?;
+//! let msg_id = client.say_line("hello")?;
 //! client.quit()?;
 //! # Ok::<(), ssip_client::ClientError>(())
 //! ```
