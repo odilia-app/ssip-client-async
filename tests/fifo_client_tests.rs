@@ -129,3 +129,159 @@ fn say_one_line() -> io::Result<()> {
         },
     )
 }
+
+macro_rules! test_setter {
+    ($setter:ident, $question:expr, $answer:expr, $code:expr, $($arg:tt)*) => {
+        #[test]
+        fn $setter() -> io::Result<()> {
+            test_client(
+                &[SET_CLIENT_COMMUNICATION, (&[$question], $answer)],
+                |client| {
+                    let status = client.$setter($($arg)*).unwrap();
+                    assert_eq!($code, status.code);
+                    Ok(())
+                },
+            )
+        }
+    };
+}
+
+macro_rules! test_getter {
+    ($getter:ident, $question:expr, $answer:expr, $value:expr) => {
+        #[test]
+        fn $getter() -> io::Result<()> {
+            test_client(
+                &[SET_CLIENT_COMMUNICATION, (&[$question], $answer)],
+                |client| {
+                    let value = client.$getter().unwrap();
+                    assert_eq!($value, value);
+                    Ok(())
+                },
+            )
+        }
+    };
+}
+
+test_setter!(
+    set_priority,
+    "SET self PRIORITY important\r\n",
+    "202 OK PRIORITY SET\r\n",
+    202,
+    Priority::Important,
+);
+
+#[test]
+fn set_debug() -> io::Result<()> {
+    test_client(
+        &[
+            SET_CLIENT_COMMUNICATION,
+            (
+                &["SET all DEBUG ON\r\n"],
+                "262-/run/user/100/speech-dispatcher/log/debug\r\n262 OK DEBUGGING SET\r\n",
+            ),
+        ],
+        |client| {
+            let output = client.set_debug(true).unwrap();
+            assert_eq!("/run/user/100/speech-dispatcher/log/debug", output);
+            Ok(())
+        },
+    )
+}
+
+test_setter!(
+    set_output_module,
+    "SET self OUTPUT_MODULE espeak-ng\r\n",
+    "216 OK OUTPUT MODULE SET\r\n",
+    216,
+    ClientScope::Current,
+    "espeak-ng",
+);
+
+test_getter!(
+    get_output_module,
+    "GET OUTPUT_MODULE\r\n",
+    "251-espeak-ng\r\n251 OK GET RETURNED\r\n",
+    "espeak-ng"
+);
+
+test_setter!(
+    set_language,
+    "SET self LANGUAGE en\r\n",
+    "201 OK LANGUAGE SET\r\n",
+    201,
+    ClientScope::Current,
+    "en",
+);
+
+test_getter!(
+    get_language,
+    "GET LANGUAGE\r\n",
+    "251-fr\r\n251 OK GET RETURNED\r\n",
+    "fr"
+);
+
+test_setter!(
+    set_rate,
+    "SET self RATE 15\r\n",
+    "203 OK RATE SET\r\n",
+    203,
+    ClientScope::Current,
+    15,
+);
+
+test_getter!(
+    get_rate,
+    "GET RATE\r\n",
+    "251-0\r\n251 OK GET RETURNED\r\n",
+    0
+);
+
+test_setter!(
+    set_volume,
+    "SET self VOLUME 80\r\n",
+    "218 OK VOLUME SET\r\n",
+    218,
+    ClientScope::Current,
+    80,
+);
+
+test_getter!(
+    get_volume,
+    "GET VOLUME\r\n",
+    "251-100\r\n251 OK GET RETURNED\r\n",
+    100
+);
+
+test_getter!(
+    get_pitch,
+    "GET PITCH\r\n",
+    "251-0\r\n251 OK GET RETURNED\r\n",
+    0
+);
+
+test_setter!(
+    set_pitch,
+    "SET self PITCH 10\r\n",
+    "204 OK PITCH SET\r\n",
+    204,
+    ClientScope::Current,
+    10,
+);
+
+#[test]
+fn list_output_modules() -> io::Result<()> {
+    test_client(
+        &[
+            SET_CLIENT_COMMUNICATION,
+            (
+                &["LIST OUTPUT_MODULES\r\n"],
+                "250-espeak-ng\r\n250-festival\r\n250 OK MODULE LIST SENT\r\n",
+            ),
+        ],
+        |client| {
+            let modules = client.list_output_modules().unwrap();
+            assert_eq!(&["espeak-ng", "festival"], modules.as_slice());
+            Ok(())
+        },
+    )
+}

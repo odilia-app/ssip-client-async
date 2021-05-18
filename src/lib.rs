@@ -36,3 +36,4 @@ pub use constants::*;
 pub use fifo::new_client as new_fifo_client;
 pub use fifo::new_default_client as new_default_fifo_client;
 pub use types::StatusLine;
+pub use types::*;

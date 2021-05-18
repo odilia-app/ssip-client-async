@@ -23,7 +23,7 @@ pub type ClientId = String;
 
 /// Message identifiers
 #[derive(Debug)]
-pub enum MessageTarget {
+pub enum MessageScope {
     /// Last message from current client
     Last,
     /// Messages from all clients
@@ -34,7 +34,7 @@ pub enum MessageTarget {
 
 /// Client identifiers
 #[derive(Debug)]
-pub enum ClientTarget {
+pub enum ClientScope {
     /// Current client
     Current,
     /// All clients
