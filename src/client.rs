@@ -44,6 +44,27 @@ pub type ClientResult<T> = Result<T, ClientError>;
 /// Client result consisting in a single status line
 pub type ClientStatus = ClientResult<StatusLine>;
 
+/// Client name
+pub struct ClientName {
+    pub user: String,
+    pub application: String,
+    pub component: String,
+}
+
+impl ClientName {
+    pub fn new(user: &str, application: &str) -> Self {
+        ClientName::with_component(user, application, "main")
+    }
+
+    pub fn with_component(user: &str, application: &str, component: &str) -> Self {
+        ClientName {
+            user: user.to_string(),
+            application: application.to_string(),
+            component: component.to_string(),
+        }
+    }
+}
+
 macro_rules! client_setter {
     ($name:ident, $doc:expr, $target_name:ident, $value_name:ident as $value_type:ty, $fmt:expr, $value:expr) => {
         #[doc=$doc]
@@ -165,18 +186,16 @@ impl<S: Read + Write> Client<S> {
     pub(crate) fn new(
         mut input: io::BufReader<S>,
         mut output: io::BufWriter<S>,
-        user: &str,
-        application: &str,
-        component: &str,
+        client_name: &ClientName,
     ) -> ClientResult<Self> {
         // https://stackoverflow.com/questions/58467659/how-to-store-tcpstream-with-bufreader-and-bufwriter-in-a-data-structure
         send_line!(
             &mut input,
             &mut output,
             "SET self CLIENT_NAME {}:{}:{}",
-            user,
-            application,
-            component
+            client_name.user,
+            client_name.application,
+            client_name.component
         )?;
         Ok(Self { input, output })
     }

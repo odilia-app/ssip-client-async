@@ -12,7 +12,7 @@ use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use crate::client::{Client, ClientResult};
+use crate::client::{Client, ClientName, ClientResult};
 
 const SPEECHD_APPLICATION_NAME: &str = "speech-dispatcher";
 const SPEECHD_SOCKET_NAME: &str = "speechd.sock";
@@ -46,33 +46,23 @@ where
 /// New FIFO client
 pub fn new_client<P>(
     socket_path: P,
-    user: &str,
-    application: &str,
-    component: &str,
+    client_name: &ClientName,
     read_timeout: Option<Duration>,
 ) -> ClientResult<Client<UnixStream>>
 where
     P: AsRef<Path>,
 {
     let (input, output) = new_pair(&socket_path, read_timeout)?;
-    Client::new(input, output, user, application, component)
+    Client::new(input, output, client_name)
 }
 
 /// New FIFO client on the standard socket `${XDG_RUNTIME_DIR}/speech-dispatcher/speechd.sock`
 pub fn new_default_client(
-    user: &str,
-    application: &str,
-    component: &str,
+    client_name: &ClientName,
     read_timeout: Option<Duration>,
 ) -> ClientResult<Client<UnixStream>> {
     let socket_path = speech_dispatcher_socket()?;
-    new_client(
-        socket_path.as_path(),
-        user,
-        application,
-        component,
-        read_timeout,
-    )
+    new_client(socket_path.as_path(), client_name, read_timeout)
 }
 
 #[cfg(test)]

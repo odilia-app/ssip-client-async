@@ -16,7 +16,8 @@
 //!
 //! Example
 //! ```no_run
-//! let mut client = ssip_client::new_default_fifo_client("joe", "hello", "main", None)?;
+//! use ssip_client::{new_default_fifo_client, ClientName};
+//! let mut client = new_default_fifo_client(&ClientName::new("joe", "hello"), None)?;
 //! let msg_id = client.say_line("hello")?;
 //! client.quit()?;
 //! # Ok::<(), ssip_client::ClientError>(())
@@ -30,7 +31,7 @@ mod constants;
 mod fifo;
 mod types;
 
-pub use client::{Client, ClientError, ClientResult, ClientStatus};
+pub use client::{Client, ClientError, ClientName, ClientResult, ClientStatus};
 pub use constants::*;
 pub use fifo::new_client as new_fifo_client;
 pub use fifo::new_default_client as new_default_fifo_client;

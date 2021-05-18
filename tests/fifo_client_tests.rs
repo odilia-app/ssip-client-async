@@ -83,7 +83,8 @@ where
     let result = std::panic::catch_unwind(move || {
         let handle = Server::run(&server_path, communication);
         let mut client =
-            ssip_client::new_fifo_client(&server_path, "test", "test", "main", None).unwrap();
+            ssip_client::new_fifo_client(&server_path, &ClientName::new("test", "test"), None)
+                .unwrap();
         process_wrapper(&mut client).unwrap();
         handle.join().unwrap()
     });
