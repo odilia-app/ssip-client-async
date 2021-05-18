@@ -28,8 +28,10 @@ mod protocol;
 mod client;
 mod constants;
 mod fifo;
+mod types;
 
-pub use client::{Client, ClientError, ClientResult, ClientStatus, StatusLine};
+pub use client::{Client, ClientError, ClientResult, ClientStatus};
 pub use constants::*;
 pub use fifo::new_client as new_fifo_client;
 pub use fifo::new_default_client as new_default_fifo_client;
+pub use types::StatusLine;

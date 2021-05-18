@@ -9,7 +9,8 @@
 
 use std::io::{self, BufRead, Write};
 
-use crate::client::{ClientError, ClientResult, ClientStatus, StatusLine};
+use crate::client::{ClientError, ClientResult, ClientStatus};
+use crate::types::StatusLine;
 
 macro_rules! invalid_input {
     ($msg:expr) => {

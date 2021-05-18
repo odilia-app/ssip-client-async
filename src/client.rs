@@ -7,34 +7,15 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-use std::fmt;
 use std::io::{self, Read, Write};
 use std::str::FromStr;
 use thiserror::Error as ThisError;
 
-use crate::constants::{
+use crate::constants::OK_RECEIVING_DATA;
+use crate::types::{
     CapitalLettersRecognitionMode, ClientTarget, KeyName, MessageId, MessageTarget, Priority,
-    PunctuationMode, ReturnCode, SynthesisVoice, OK_RECEIVING_DATA,
+    PunctuationMode, StatusLine, SynthesisVoice,
 };
-
-/// Command status line
-///
-/// Consists in a 3-digits code and a message. It can be a success or a failure.
-///
-/// Examples:
-/// - 216 OK OUTPUT MODULE SET
-/// - 409 ERR RATE TOO HIGH
-#[derive(Debug, PartialEq)]
-pub struct StatusLine {
-    pub code: ReturnCode,
-    pub message: String,
-}
-
-impl fmt::Display for StatusLine {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {}", self.code, self.message)
-    }
-}
 
 /// Client error, either I/O error or SSIP error.
 #[derive(ThisError, Debug)]
@@ -74,7 +55,7 @@ macro_rules! client_setter {
             let line = match $target_name {
                 ClientTarget::Current => format!($fmt, "self", $value),
                 ClientTarget::All => format!($fmt, "all", $value),
-                ClientTarget::Message(id) => format!($fmt, id, $value),
+                ClientTarget::Client(id) => format!($fmt, id, $value),
             };
             send_lines!(&mut self.input, &mut self.output, &[line.as_str()])
         }
