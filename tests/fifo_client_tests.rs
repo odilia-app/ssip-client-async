@@ -176,7 +176,7 @@ fn set_debug() -> io::Result<()> {
         &[
             SET_CLIENT_COMMUNICATION,
             (
-                &["SET all DEBUG ON\r\n"],
+                &["SET all DEBUG on\r\n"],
                 "262-/run/user/100/speech-dispatcher/log/debug\r\n262 OK DEBUGGING SET\r\n",
             ),
         ],
@@ -266,6 +266,41 @@ test_setter!(
     204,
     ClientScope::Current,
     10,
+);
+
+test_setter!(
+    set_ssml_mode,
+    "SET self SSML_MODE on\r\n",
+    "219 OK SSML MODE SET\r\n",
+    219,
+    true
+);
+
+test_setter!(
+    set_spelling,
+    "SET self SPELLING on\r\n",
+    "207 OK SPELLING SET\r\n'",
+    207,
+    ClientScope::Current,
+    true
+);
+
+test_setter!(
+    set_punctuation_mode,
+    "SET self PUNCTUATION all\r\n",
+    "205 OK PUNCTUATION SET\r\n",
+    205,
+    ClientScope::Current,
+    PunctuationMode::All
+);
+
+test_setter!(
+    set_capital_letter_recogn,
+    "SET self CAP_LET_RECOGN spell\r\n",
+    "206 OK CAP LET RECOGNITION SET\r\n",
+    206,
+    ClientScope::Current,
+    CapitalLettersRecognitionMode::Spell
 );
 
 #[test]

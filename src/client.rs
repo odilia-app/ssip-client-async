@@ -68,9 +68,9 @@ impl ClientName {
 /// Convert boolean to ON or OFF
 fn on_off(value: bool) -> &'static str {
     if value {
-        "ON"
+        "on"
     } else {
-        "OFF"
+        "off"
     }
 }
 
