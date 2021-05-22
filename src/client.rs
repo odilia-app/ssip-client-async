@@ -446,3 +446,22 @@ impl<S: Read + Write> Client<S> {
 
     client_setter!(quit, "Close the connection", "QUIT");
 }
+
+#[cfg(test)]
+mod tests {
+
+    use std::net::TcpStream;
+
+    use super::{Client, ClientError};
+
+    #[test]
+    fn parse_single_value() {
+        let result = Client::<TcpStream>::parse_single_value(&[String::from("one")]).unwrap();
+        assert_eq!("one", result);
+        let err_empty = Client::<TcpStream>::parse_single_value(&[]);
+        assert!(matches!(err_empty, Err(ClientError::NoLine)));
+        let err_too_many =
+            Client::<TcpStream>::parse_single_value(&[String::from("one"), String::from("two")]);
+        assert!(matches!(err_too_many, Err(ClientError::TooManyLines)));
+    }
+}

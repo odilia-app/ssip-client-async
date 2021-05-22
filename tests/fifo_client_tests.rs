@@ -220,6 +220,13 @@ test_getter!(
     "espeak-ng"
 );
 
+test_list!(
+    list_output_modules,
+    "LIST OUTPUT_MODULES\r\n",
+    "250-espeak-ng\r\n250-festival\r\n250 OK MODULE LIST SENT\r\n",
+    &["espeak-ng", "festival"]
+);
+
 test_setter!(
     set_language,
     "SET self LANGUAGE en\r\n",
@@ -342,9 +349,27 @@ test_list!(
     &[ "MALE1", "MALE2", "FEMALE1", "FEMALE2", "CHILD_MALE", "CHILD_FEMALE" ]
 );
 
-test_list!(
-    list_output_modules,
-    "LIST OUTPUT_MODULES\r\n",
-    "250-espeak-ng\r\n250-festival\r\n250 OK MODULE LIST SENT\r\n",
-    &["espeak-ng", "festival"]
-);
+#[test]
+fn list_synthesis_voices() -> io::Result<()> {
+    test_client(
+        &[
+            SET_CLIENT_COMMUNICATION,
+            (
+                &["LIST SYNTHESIS_VOICES\r\n"],
+                "249-Amharic\tam\tnone\r\n249-Greek+Auntie\tel\tAuntie\r\n249-Vietnamese (Southern)+shelby\tvi-VN-X-SOUTH\tshelby\r\n249 OK VOICE LIST SENT\r\n"
+            ),
+        ],
+        |client| {
+            let voices = client.list_synthesis_voices().unwrap();
+            let expected_voices: [SynthesisVoice; 3] = [ SynthesisVoice::new("Amharic", Some("am"), None),
+                                     SynthesisVoice::new("Greek+Auntie", Some("el"), Some("Auntie")),
+                                     SynthesisVoice::new("Vietnamese (Southern)+shelby", Some("vi-VN-X-SOUTH"), Some("shelby")),
+            ];
+            assert_eq!(expected_voices.len(), voices.len());
+            for (expected, found) in expected_voices.iter().zip(voices.iter()) {
+                assert_eq!(*expected, *found);
+            }
+            Ok(())
+        },
+    )
+}

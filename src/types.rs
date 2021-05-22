@@ -230,6 +230,7 @@ pub enum KeyName {
 }
 
 /// Synthesis voice
+#[derive(Debug, PartialEq)]
 pub struct SynthesisVoice {
     pub name: String,
     pub language: Option<String>,
@@ -237,6 +238,13 @@ pub struct SynthesisVoice {
 }
 
 impl SynthesisVoice {
+    pub fn new(name: &str, language: Option<&str>, dialect: Option<&str>) -> SynthesisVoice {
+        SynthesisVoice {
+            name: name.to_string(),
+            language: language.map(|s| s.to_string()),
+            dialect: dialect.map(|s| s.to_string()),
+        }
+    }
     /// Parse Option::None or string "none" into Option::None
     fn parse_none(token: Option<&str>) -> Option<String> {
         match token {
@@ -253,7 +261,7 @@ impl FromStr for SynthesisVoice {
     type Err = std::io::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut iter = s.split_whitespace();
+        let mut iter = s.split('\t');
         Ok(SynthesisVoice {
             name: String::from(iter.next().unwrap()),
             language: SynthesisVoice::parse_none(iter.next()),
@@ -278,5 +286,29 @@ pub struct StatusLine {
 impl fmt::Display for StatusLine {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} {}", self.code, self.message)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::str::FromStr;
+
+    use super::SynthesisVoice;
+
+    #[test]
+    fn parse_synthesis_voice() {
+        // Voice with dialect
+        let v1 =
+            SynthesisVoice::from_str("Portuguese (Portugal)+Kaukovalta\tpt\tKaukovalta").unwrap();
+        assert_eq!("Portuguese (Portugal)+Kaukovalta", v1.name);
+        assert_eq!("pt", v1.language.unwrap());
+        assert_eq!("Kaukovalta", v1.dialect.unwrap());
+
+        // Voice without dialect
+        let v2 = SynthesisVoice::from_str("Esperanto\teo\tnone").unwrap();
+        assert_eq!("Esperanto", v2.name);
+        assert_eq!("eo", v2.language.unwrap());
+        assert!(matches!(v2.dialect, None));
     }
 }
