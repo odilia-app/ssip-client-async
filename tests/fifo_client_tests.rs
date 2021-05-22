@@ -162,6 +162,22 @@ macro_rules! test_getter {
     };
 }
 
+macro_rules! test_list {
+    ($getter:ident, $question:expr, $answer:expr, $values:expr) => {
+        #[test]
+        fn $getter() -> io::Result<()> {
+            test_client(
+                &[SET_CLIENT_COMMUNICATION, (&[$question], $answer)],
+                |client| {
+                    let values = client.$getter().unwrap();
+                    assert_eq!($values, values.as_slice());
+                    Ok(())
+                },
+            )
+        }
+    };
+}
+
 test_setter!(
     set_priority,
     "SET self PRIORITY important\r\n",
@@ -303,20 +319,32 @@ test_setter!(
     CapitalLettersRecognitionMode::Spell
 );
 
-#[test]
-fn list_output_modules() -> io::Result<()> {
-    test_client(
-        &[
-            SET_CLIENT_COMMUNICATION,
-            (
-                &["LIST OUTPUT_MODULES\r\n"],
-                "250-espeak-ng\r\n250-festival\r\n250 OK MODULE LIST SENT\r\n",
-            ),
-        ],
-        |client| {
-            let modules = client.list_output_modules().unwrap();
-            assert_eq!(&["espeak-ng", "festival"], modules.as_slice());
-            Ok(())
-        },
-    )
-}
+test_getter!(
+    get_voice_type,
+    "GET VOICE_TYPE\r\n",
+    "251-MALE1\r\n251 OK GET RETURNED\r\n",
+    "MALE1"
+);
+
+test_setter!(
+    set_voice_type,
+    "SET self VOICE_TYPE FEMALE1\r\n",
+    "209 OK VOICE SET\r\n",
+    209,
+    ClientScope::Current,
+    "FEMALE1"
+);
+
+test_list!(
+    list_voice_types,
+    "LIST VOICES\r\n",
+    "249-MALE1\r\n249-MALE2\r\n249-FEMALE1\r\n249-FEMALE2\r\n249-CHILD_MALE\r\n249-CHILD_FEMALE\r\n249 OK VOICE LIST SENT\r\n",
+    &[ "MALE1", "MALE2", "FEMALE1", "FEMALE2", "CHILD_MALE", "CHILD_FEMALE" ]
+);
+
+test_list!(
+    list_output_modules,
+    "LIST OUTPUT_MODULES\r\n",
+    "250-espeak-ng\r\n250-festival\r\n250 OK MODULE LIST SENT\r\n",
+    &["espeak-ng", "festival"]
+);

@@ -357,14 +357,14 @@ impl<S: Read + Write> Client<S> {
         "SET {} VOICE_TYPE {}"
     );
 
-    client_getter!(
+    client_single_getter!(
         get_voice_type,
         "Get the current pre-defined voice",
         "GET VOICE_TYPE"
     );
 
     client_getter!(
-        list_voices,
+        list_voice_types,
         "List the available symbolic voice names",
         "LIST VOICES"
     );
