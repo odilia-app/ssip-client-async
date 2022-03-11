@@ -9,10 +9,10 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-dirs = "3"
+dirs = "4"
 thiserror = "1"
-strum = "0.20"
-strum_macros = "0.20"
+strum = "0.24"
+strum_macros = "0.24"
 
 [dev-dependencies]
 libc = "0"

@@ -1,3 +1,11 @@
+// Copyright (c) 2021-2022 Laurent Pelecq
+//
+// Licensed under the Apache License, Version 2.0
+// <LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
+// license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. All files in the project carrying such notice may not be copied,
+// modified, or distributed except according to those terms.
+
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
@@ -60,11 +68,10 @@ impl Server {
     {
         let server_path = socket_path.as_ref().to_path_buf();
         let mut server = Server::new(&server_path, communication).unwrap();
-        let handle = thread::spawn(move || -> io::Result<()> {
+        thread::spawn(move || -> io::Result<()> {
             server.serve()?;
             Ok(())
-        });
-        handle
+        })
     }
 }
 
@@ -78,7 +85,7 @@ where
 {
     let socket_path = Server::temporary_path();
     assert!(!socket_path.exists());
-    let server_path = socket_path.to_path_buf();
+    let server_path = socket_path.clone();
     let mut process_wrapper = std::panic::AssertUnwindSafe(process);
     let result = std::panic::catch_unwind(move || {
         let handle = Server::run(&server_path, communication);
@@ -89,11 +96,11 @@ where
         handle.join().unwrap()
     });
     std::fs::remove_file(socket_path)?;
-    assert_eq!((), result.unwrap().unwrap());
+    result.unwrap().unwrap();
     Ok(())
 }
 
-const SET_CLIENT_COMMUNICATION: (&'static [&'static str], &'static str) = (
+const SET_CLIENT_COMMUNICATION: (&[&str], &str) = (
     &["SET self CLIENT_NAME test:test:main\r\n"],
     "208 OK CLIENT NAME SET\r\n",
 );

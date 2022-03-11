@@ -1,5 +1,5 @@
 // ssip-client -- Speech Dispatcher client in Rust
-// Copyright (c) 2021 Laurent Pelecq
+// Copyright (c) 2021-2022 Laurent Pelecq
 //
 // Licensed under the Apache License, Version 2.0
 // <LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
@@ -83,7 +83,7 @@ pub(crate) fn receive_answer(
         match line.chars().nth(3) {
             Some(ch) => match ch {
                 ' ' => match line[0..3].parse::<u16>() {
-                    Ok(code) => return parse_status_line(code, &line[4..].trim_end()),
+                    Ok(code) => return parse_status_line(code, line[4..].trim_end()),
                     Err(err) => return Err(invalid_input!(err.to_string())),
                 },
                 '-' => match lines {
