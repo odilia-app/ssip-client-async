@@ -229,6 +229,78 @@ pub enum KeyName {
     Window,
 }
 
+/// Notification type
+#[derive(StrumDisplay, Debug)]
+pub enum NotificationType {
+    #[strum(serialize = "begin")]
+    Begin,
+    #[strum(serialize = "end")]
+    End,
+    #[strum(serialize = "cancel")]
+    Cancel,
+    #[strum(serialize = "pause")]
+    Pause,
+    #[strum(serialize = "resume")]
+    Resume,
+    #[strum(serialize = "index_mark")]
+    IndexMark,
+    #[strum(serialize = "all")]
+    All,
+}
+
+/// Notification event type (returned by server)
+#[derive(StrumDisplay, Debug)]
+pub enum EventType {
+    Begin,
+    End,
+    Cancel,
+    Pause,
+    Resume,
+    IndexMark(String),
+}
+
+/// Notification event
+#[derive(Debug)]
+pub struct Event {
+    pub ntype: EventType,
+    pub message: String,
+    pub client: String,
+}
+
+impl Event {
+    pub fn new(ntype: EventType, message: String, client: String) -> Event {
+        Event {
+            ntype,
+            message,
+            client,
+        }
+    }
+
+    pub fn begin(message: String, client: String) -> Event {
+        Event::new(EventType::Begin, message, client)
+    }
+
+    pub fn end(message: String, client: String) -> Event {
+        Event::new(EventType::End, message, client)
+    }
+
+    pub fn index_mark(mark: String, message: String, client: String) -> Event {
+        Event::new(EventType::IndexMark(mark), message, client)
+    }
+
+    pub fn cancel(message: String, client: String) -> Event {
+        Event::new(EventType::Cancel, message, client)
+    }
+
+    pub fn pause(message: String, client: String) -> Event {
+        Event::new(EventType::Pause, message, client)
+    }
+
+    pub fn resume(message: String, client: String) -> Event {
+        Event::new(EventType::Resume, message, client)
+    }
+}
+
 /// Synthesis voice
 #[derive(Debug, PartialEq)]
 pub struct SynthesisVoice {

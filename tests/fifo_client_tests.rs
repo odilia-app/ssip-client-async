@@ -41,7 +41,7 @@ impl Server {
             for question in questions.iter() {
                 let mut line = String::new();
                 input.read_line(&mut line)?;
-                if line != dbg!(*question) {
+                if line != *question {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
                         format!("read <{}> instead of <{}>", dbg!(line), *question),
@@ -76,6 +76,8 @@ impl Server {
 }
 
 /// Create a server and run the client
+///
+/// The communication is an array of (["question", ...], "response")
 fn test_client<F>(
     communication: &'static [(&'static [&'static str], &'static str)],
     process: F,
@@ -377,6 +379,32 @@ fn list_synthesis_voices() -> io::Result<()> {
                 assert_eq!(*expected, *found);
             }
             Ok(())
+        },
+    )
+}
+
+#[test]
+fn receive_notification() -> io::Result<()> {
+    test_client(
+        &[
+            SET_CLIENT_COMMUNICATION,
+            (&["SPEAK\r\n"], "230 OK RECEIVING DATA\r\n"),
+            (
+                &["Hello, world\r\n", ".\r\n"],
+                "225-21\r\n225 OK MESSAGE QUEUED\r\n701-21\r\n701-test\r\n701 BEGIN\r\n",
+            ),
+        ],
+        |client| {
+            assert_eq!("21", client.say_line("Hello, world").unwrap(),);
+            match client.receive_event() {
+                Ok(Event {
+                    ntype: EventType::Begin,
+                    message: _,
+                    client: _,
+                }) => Ok(()),
+                Ok(_) => panic!("wrong event"),
+                Err(_) => panic!("error on event"),
+            }
         },
     )
 }

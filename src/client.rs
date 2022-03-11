@@ -13,23 +13,25 @@ use thiserror::Error as ThisError;
 
 use crate::constants::OK_RECEIVING_DATA;
 use crate::types::{
-    CapitalLettersRecognitionMode, ClientScope, KeyName, MessageId, MessageScope, Priority,
-    PunctuationMode, StatusLine, SynthesisVoice,
+    CapitalLettersRecognitionMode, ClientScope, Event, KeyName, MessageId, MessageScope,
+    NotificationType, Priority, PunctuationMode, StatusLine, SynthesisVoice,
 };
 
 /// Client error, either I/O error or SSIP error.
 #[derive(ThisError, Debug)]
 pub enum ClientError {
-    #[error("I/O: {0}")]
-    Io(io::Error),
-    #[error("SSIP: {0}")]
-    Ssip(StatusLine),
-    #[error("No line in result")]
-    NoLine,
-    #[error("Too many lines")]
-    TooManyLines,
     #[error("Invalid type")]
     InvalidType,
+    #[error("I/O: {0}")]
+    Io(io::Error),
+    #[error("No line in result")]
+    NoLine,
+    #[error("SSIP: {0}")]
+    Ssip(StatusLine),
+    #[error("Too many lines")]
+    TooManyLines,
+    #[error("Truncated message")]
+    TruncatedMessage,
 }
 
 impl From<io::Error> for ClientError {
@@ -445,6 +447,49 @@ impl<S: Read + Write> Client<S> {
     client_setter!(block_end, "End a block", "BLOCK END");
 
     client_setter!(quit, "Close the connection", "QUIT");
+
+    client_setter!(
+        enable_notification,
+        "Enable notification events",
+        value as NotificationType,
+        "SET self NOTIFICATION {} on"
+    );
+
+    client_setter!(
+        disable_notification,
+        "Disable notification events",
+        value as NotificationType,
+        "SET self NOTIFICATION {} off"
+    );
+
+    /// Receive a notification
+    pub fn receive_event(&mut self) -> ClientResult<Event> {
+        let mut lines = Vec::new();
+        crate::protocol::receive_answer(&mut self.input, Some(&mut lines)).and_then(|status| {
+            if lines.len() < 2 {
+                Err(ClientError::TruncatedMessage)
+            } else {
+                let message = lines[0].to_owned();
+                let client = lines[1].to_owned();
+                match status.code {
+                    700 => {
+                        if lines.len() != 3 {
+                            Err(ClientError::TruncatedMessage)
+                        } else {
+                            let mark = lines[3].to_owned();
+                            Ok(Event::index_mark(mark, message, client))
+                        }
+                    }
+                    701 => Ok(Event::begin(message, client)),
+                    702 => Ok(Event::end(message, client)),
+                    703 => Ok(Event::cancel(message, client)),
+                    704 => Ok(Event::pause(message, client)),
+                    705 => Ok(Event::resume(message, client)),
+                    _ => Err(ClientError::InvalidType),
+                }
+            }
+        })
+    }
 }
 
 #[cfg(test)]
