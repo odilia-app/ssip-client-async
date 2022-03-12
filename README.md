@@ -1,10 +1,23 @@
 Rust SSIP Client
 ================
 
-[![build status](https://gitlab.com/lp-accessibility/ssip-client/badges/master/pipeline.svg)](https://gitlab.com/lp-accessibility/ssip-client/commits/master)
-[![license](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](https://gitlab.com/lp-accessibility/ssip-client/raw/master/COPYING)
+[![build status](https://gitlab.com/lp-accessibility/ssip-client/badges/main/pipeline.svg)](https://gitlab.com/lp-accessibility/ssip-client/commits/main)
+[![license](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](https://gitlab.com/lp-accessibility/ssip-client/raw/main/LICENSE-MIT)
 
 Speech Dispatcher [SSIP client library](http://htmlpreview.github.io/?https://github.com/brailcom/speechd/blob/master/doc/ssip.html) in pure rust.
+
+* Support notifications.
+* Message history is not yet supported.
+
+Example
+-------
+
+```rust
+use ssip_client::{new_default_fifo_client, ClientName};
+let mut client = new_default_fifo_client(&ClientName::new("joe", "hello"), None)?;
+let msg_id = client.say_line("hello")?;
+client.quit()?;
+```
 
 License
 -------
