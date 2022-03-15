@@ -22,7 +22,7 @@ use server::Server;
 /// The communication is an array of (["question", ...], "response")
 #[cfg(not(feature = "metal-io"))]
 fn test_client<F>(
-    communication: &'static [(&'static [&'static str], &'static str)],
+    communication: &'static [(&'static str, &'static str)],
     process: F,
 ) -> io::Result<()>
 where
@@ -49,8 +49,8 @@ where
 }
 
 #[cfg(not(feature = "metal-io"))]
-const SET_CLIENT_COMMUNICATION: (&[&str], &str) = (
-    &["SET self CLIENT_NAME test:test:main\r\n"],
+const SET_CLIENT_COMMUNICATION: (&str, &str) = (
+    "SET self CLIENT_NAME test:test:main\r\n",
     "208 OK CLIENT NAME SET\r\n",
 );
 
@@ -60,7 +60,7 @@ fn connect_and_quit() -> io::Result<()> {
     test_client(
         &[
             SET_CLIENT_COMMUNICATION,
-            (&["QUIT\r\n"], "231 HAPPY HACKING\r\n"),
+            ("QUIT\r\n", "231 HAPPY HACKING\r\n"),
         ],
         |client| {
             client.quit().unwrap().check_status(OK_BYE).unwrap();
@@ -75,9 +75,9 @@ fn say_one_line() -> io::Result<()> {
     test_client(
         &[
             SET_CLIENT_COMMUNICATION,
-            (&["SPEAK\r\n"], "230 OK RECEIVING DATA\r\n"),
+            ("SPEAK\r\n", "230 OK RECEIVING DATA\r\n"),
             (
-                &["Hello, world\r\n", ".\r\n"],
+                "Hello, world\r\n.\r\n",
                 "225-21\r\n225 OK MESSAGE QUEUED\r\n",
             ),
         ],
@@ -105,7 +105,7 @@ macro_rules! test_setter {
         #[cfg(not(feature = "metal-io"))]
         fn $setter() -> io::Result<()> {
             test_client(
-                &[SET_CLIENT_COMMUNICATION, (&[$question], $answer)],
+                &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
                 |client| {
                     client.$setter($($arg)*).unwrap().check_status($code).unwrap();
                     Ok(())
@@ -121,7 +121,7 @@ macro_rules! test_getter {
         #[cfg(not(feature = "metal-io"))]
         fn $getter() -> io::Result<()> {
             test_client(
-                &[SET_CLIENT_COMMUNICATION, (&[$question], $answer)],
+                &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
                 |client| {
                     let value = client.$getter().unwrap().$receive(251).unwrap();
                     assert_eq!($value, value);
@@ -141,7 +141,7 @@ macro_rules! test_list {
         #[cfg(not(feature = "metal-io"))]
         fn $getter() -> io::Result<()> {
             test_client(
-                &[SET_CLIENT_COMMUNICATION, (&[$question], $answer)],
+                &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
                 |client| {
                     let values = client.$getter().unwrap().receive_lines($code).unwrap();
                     assert_eq!($values, values.as_slice());
@@ -167,7 +167,7 @@ fn set_debug() -> io::Result<()> {
         &[
             SET_CLIENT_COMMUNICATION,
             (
-                &["SET all DEBUG on\r\n"],
+                "SET all DEBUG on\r\n",
                 "262-/run/user/100/speech-dispatcher/log/debug\r\n262 OK DEBUGGING SET\r\n",
             ),
         ],
@@ -340,7 +340,7 @@ fn list_synthesis_voices() -> io::Result<()> {
         &[
             SET_CLIENT_COMMUNICATION,
             (
-                &["LIST SYNTHESIS_VOICES\r\n"],
+                "LIST SYNTHESIS_VOICES\r\n",
                 "249-Amharic\tam\tnone\r\n249-Greek+Auntie\tel\tAuntie\r\n249-Vietnamese (Southern)+shelby\tvi-VN-X-SOUTH\tshelby\r\n249 OK VOICE LIST SENT\r\n"
             ),
         ],
@@ -365,9 +365,9 @@ fn receive_notification() -> io::Result<()> {
     test_client(
         &[
             SET_CLIENT_COMMUNICATION,
-            (&["SPEAK\r\n"], "230 OK RECEIVING DATA\r\n"),
+            ("SPEAK\r\n", "230 OK RECEIVING DATA\r\n"),
             (
-                &["Hello, world\r\n", ".\r\n"],
+                "Hello, world\r\n.\r\n",
                 "225-21\r\n225 OK MESSAGE QUEUED\r\n701-21\r\n701-test\r\n701 BEGIN\r\n",
             ),
         ],

@@ -15,7 +15,7 @@ use std::os::unix::net::UnixListener;
 /// Server on a named socket.
 pub struct Server {
     listener: UnixListener,
-    communication: Vec<(&'static [&'static str], &'static str)>,
+    communication: Vec<(&'static str, &'static str)>,
 }
 
 impl Server {
@@ -25,7 +25,7 @@ impl Server {
     /// the server will receive and the second item is the answer.
     pub fn new<P>(
         socket_path: &P,
-        communication: &[(&'static [&'static str], &'static str)],
+        communication: &[(&'static str, &'static str)],
     ) -> io::Result<Self>
     where
         P: AsRef<Path>,
@@ -37,12 +37,20 @@ impl Server {
         })
     }
 
+    fn split_lines(lines: &str) -> Vec<String> {
+        lines
+            .trim_end()
+            .split("\r\n")
+            .map(|s| format!("{}\r\n", s))
+            .collect::<Vec<String>>()
+    }
+
     pub fn serve(&mut self) -> io::Result<()> {
         let (stream, _) = self.listener.accept()?;
         let mut input = BufReader::new(stream.try_clone()?);
         let mut output = BufWriter::new(stream);
         for (questions, answer) in self.communication.iter() {
-            for question in questions.iter() {
+            for question in Server::split_lines(questions).iter() {
                 let mut line = String::new();
                 input.read_line(&mut line)?;
                 if line != *question {
@@ -65,7 +73,7 @@ impl Server {
 
     pub fn run<P>(
         socket_path: P,
-        communication: &'static [(&'static [&'static str], &'static str)],
+        communication: &'static [(&'static str, &'static str)],
     ) -> thread::JoinHandle<io::Result<()>>
     where
         P: AsRef<Path>,
@@ -76,5 +84,18 @@ impl Server {
             server.serve()?;
             Ok(())
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::Server;
+
+    #[test]
+    fn test_split_lines() {
+        const ONE_LINE: &str = "one line\r\n";
+        let one_line = Server::split_lines(ONE_LINE);
+        assert_eq!(&[ONE_LINE], one_line.as_slice());
     }
 }
