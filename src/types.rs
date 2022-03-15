@@ -361,10 +361,10 @@ impl fmt::Display for StatusLine {
     }
 }
 
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 pub use std::fmt::Debug as Source; // Trick to have common implementation for sync and async.
 
-#[cfg(feature = "metal-io")]
+#[cfg(feature = "async-mio")]
 pub use mio::event::Source;
 
 #[cfg(test)]

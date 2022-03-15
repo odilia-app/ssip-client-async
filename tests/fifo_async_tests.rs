@@ -6,18 +6,18 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-#[cfg(feature = "metal-io")]
+#[cfg(feature = "async-mio")]
 use mio::{Events, Poll, Token};
-#[cfg(feature = "metal-io")]
+#[cfg(feature = "async-mio")]
 use ssip_client::*;
 
-#[cfg(feature = "metal-io")]
+#[cfg(feature = "async-mio")]
 mod server;
 
-#[cfg(feature = "metal-io")]
+#[cfg(feature = "async-mio")]
 use server::Server;
 
-#[cfg(feature = "metal-io")]
+#[cfg(feature = "async-mio")]
 mod utils {
 
     use ssip_client::*;
@@ -58,11 +58,11 @@ mod utils {
     }
 }
 
-#[cfg(feature = "metal-io")]
+#[cfg(feature = "async-mio")]
 use utils::Controler;
 
 #[test]
-#[cfg(feature = "metal-io")]
+#[cfg(feature = "async-mio")]
 fn basic_async_communication() -> std::io::Result<()> {
     const COMMUNICATION: [(&str, &str); 1] = [(
         "SET self CLIENT_NAME test:test:main\r\n",
@@ -77,30 +77,21 @@ fn basic_async_communication() -> std::io::Result<()> {
         let mut poll = Poll::new()?;
         let mut events = Events::with_capacity(128);
         let mut client = FifoBuilder::new().path(&server_path).build().unwrap();
-        let token = Token(0);
-        client.register(&poll, token).unwrap();
+        let input_token = Token(0);
+        let output_token = Token(1);
+        client.register(&poll, input_token, output_token).unwrap();
         let mut controler = Controler::new();
-        use std::io::Write;
-        let mut log_file = std::fs::File::create("/home/laurent/tmp/test_client.log")?;
         while controler.step() < 2 {
             poll.poll(&mut events, None)?;
-            log_file.write_all(format!("Step: {}\n", controler.step()).as_bytes())?;
             for event in &events {
-                if event.token() == token {
-                    if event.is_writable() {
-                        log_file.write_all(b"Event writable\n")?;
-                        if controler.step() == 0 {
-                            log_file.write_all(b"Send: set client name\n")?;
-                            controler.check_result(
-                                client.set_client_name(ClientName::new("test", "test")),
-                            );
-                        }
-                    } else if event.is_readable() {
-                        log_file.write_all(b"Event readable\n")?;
-                        if controler.step() == 1 {
-                            log_file.write_all(b"Receive: client name set\n")?;
-                            controler.check_result(client.check_client_name_set());
-                        }
+                if event.token() == output_token && event.is_writable() {
+                    if controler.step() == 0 {
+                        controler
+                            .check_result(client.set_client_name(ClientName::new("test", "test")));
+                    }
+                } else if event.token() == input_token && event.is_readable() {
+                    if controler.step() == 1 {
+                        controler.check_result(client.check_client_name_set());
                     }
                 }
             }

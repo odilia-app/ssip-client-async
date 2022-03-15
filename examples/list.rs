@@ -1,10 +1,10 @@
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 use ssip_client::{
     ClientName, ClientResult, FifoBuilder, SynthesisVoice, OK_OUTPUT_MODULES_LIST_SENT,
     OK_VOICES_LIST_SENT,
 };
 
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 fn main() -> ClientResult<()> {
     fn voice_to_string(voice: &SynthesisVoice) -> String {
         match &voice.language {
@@ -54,7 +54,7 @@ fn main() -> ClientResult<()> {
     Ok(())
 }
 
-#[cfg(feature = "metal-io")]
+#[cfg(feature = "async-mio")]
 fn main() {
     println!("asynchronous client not implemented");
 }

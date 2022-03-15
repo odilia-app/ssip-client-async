@@ -213,7 +213,8 @@ impl<S: Read + Write + Source> Client<S> {
     /// Send a line
     pub fn send_line(&mut self, line: &str) -> ClientResult<&mut Client<S>> {
         const END_OF_DATA: &str = ".";
-        self.send_lines(&[line, END_OF_DATA])
+        send_lines(&mut self.output, &[line, END_OF_DATA])?;
+        Ok(self)
     }
 
     /// Send a char
@@ -470,8 +471,8 @@ impl<S: Read + Write + Source> Client<S> {
     }
 
     /// Receive integer
-    pub fn receive_u8(&mut self, expected_code: ReturnCode) -> ClientResult<u8> {
-        self.receive_string(expected_code)
+    pub fn receive_u8(&mut self) -> ClientResult<u8> {
+        self.receive_string(OK_GET)
             .and_then(|s| s.parse().map_err(|_| ClientError::InvalidType))
     }
 
@@ -533,12 +534,17 @@ impl<S: Read + Write + Source> Client<S> {
     }
 
     /// Register the socket for polling.
-    #[cfg(feature = "metal-io")]
-    pub fn register(&mut self, poll: &mio::Poll, token: mio::Token) -> ClientResult<()> {
+    #[cfg(feature = "async-mio")]
+    pub fn register(
+        &mut self,
+        poll: &mio::Poll,
+        input_token: mio::Token,
+        output_token: mio::Token,
+    ) -> ClientResult<()> {
         poll.registry()
-            .register(self.output.get_mut(), token, mio::Interest::WRITABLE)?;
+            .register(self.input.get_mut(), input_token, mio::Interest::READABLE)?;
         poll.registry()
-            .register(self.input.get_mut(), token, mio::Interest::READABLE)?;
+            .register(self.output.get_mut(), output_token, mio::Interest::WRITABLE)?;
         Ok(())
     }
 }
@@ -546,10 +552,10 @@ impl<S: Read + Write + Source> Client<S> {
 #[cfg(test)]
 mod tests {
 
-    #[cfg(not(feature = "metal-io"))]
+    #[cfg(not(feature = "async-mio"))]
     use std::net::TcpStream;
 
-    #[cfg(feature = "metal-io")]
+    #[cfg(feature = "async-mio")]
     use mio::net::TcpStream;
 
     use super::{Client, ClientError};

@@ -16,7 +16,7 @@
 //!
 //! Example
 //! ```no_run
-//! use ssip_client::{FifoBuilder, ClientName, OK_CLIENT_NAME_SET};
+//! use ssip_client::{FifoBuilder, ClientName};
 //! let mut client = FifoBuilder::new().build()?;
 //! client
 //!     .set_client_name(ClientName::new("joe", "hello"))?

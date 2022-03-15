@@ -8,6 +8,8 @@ Rust SSIP Client
 
 Speech Dispatcher [SSIP client library](http://htmlpreview.github.io/?https://github.com/brailcom/speechd/blob/master/doc/ssip.html) in pure rust.
 
+The API is synchronous by default. An asynchronous API based on [Mio](https://github.com/tokio-rs/mio) is available with a feature.
+
 - [x] Unix socket.
 - [ ] TCP socket.
 - [x] Stop, cancel, pause and resume.
@@ -16,16 +18,31 @@ Speech Dispatcher [SSIP client library](http://htmlpreview.github.io/?https://gi
 - [x] Notifications.
 - [ ] Message history.
 
+Getting Started
+---------------
+
+To use the synchronous API, use:
+
+```toml
+[dependencies]
+ssip-client = "0.3"
+```
+
+For the asynchronous API, use:
+```toml
+[dependencies]
+ssip-client = { version = "0.3", features = ["async-mio"] }
+```
+
 Example
 -------
 
 ```rust
-use ssip_client::{new_default_fifo_client, ClientName, OK_CLIENT_NAME_SET};
-
-let mut client = new_default_fifo_client(None)?;
+use ssip_client::{FifoBuilder, ClientName};
+let mut client = FifoBuilder::new().build()?;
 client
-    .open(ClientName::new("joe", "hello"))?
-    .check_status(OK_CLIENT_NAME_SET)?;
+    .set_client_name(ClientName::new("joe", "hello"))?
+    .check_client_name_set()?;
 let msg_id = client.speak()?.send_line("hello")?.receive_message_id()?;
 client.quit()?;
 ```

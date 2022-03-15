@@ -1,16 +1,27 @@
-#[cfg(not(feature = "metal-io"))]
-use ssip_client::{ClientName, ClientResult, EventType, FifoBuilder, NotificationType};
+#[cfg(not(feature = "async-mio"))]
+use ssip_client::{
+    ClientName, ClientResult, EventType, FifoBuilder, NotificationType, OK_NOTIFICATION_SET,
+};
 
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 fn main() -> ClientResult<()> {
     let mut client = FifoBuilder::new().build()?;
     client
         .set_client_name(ClientName::new("joe", "notifications"))?
         .check_client_name_set()?;
-    client.enable_notification(NotificationType::All).unwrap();
-    let msg_id = client.speak()?.send_line("hello")?.receive_message_id()?;
-    println!("message: {}", msg_id);
+    // Enabling notifications
+    client
+        .enable_notification(NotificationType::All)?
+        .check_status(OK_NOTIFICATION_SET)?;
+    // Sending message
+    let msg_id = client
+        .speak()?
+        .check_receiving_data()?
+        .send_line("hello")?
+        .receive_message_id()?;
+    println!("message identifier: {}", msg_id);
     loop {
+        // Waiting for event
         match client.receive_event() {
             Ok(event) => {
                 println!(
@@ -27,11 +38,12 @@ fn main() -> ClientResult<()> {
             }
         }
     }
+    println!("exiting...");
     client.quit()?;
     Ok(())
 }
 
-#[cfg(feature = "metal-io")]
+#[cfg(feature = "async-mio")]
 fn main() {
     println!("asynchronous client not implemented");
 }

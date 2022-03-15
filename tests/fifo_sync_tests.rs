@@ -6,21 +6,21 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 use ssip_client::*;
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 use std::{io, os::unix::net::UnixStream};
 
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 mod server;
 
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 use server::Server;
 
 /// Create a server and run the client
 ///
 /// The communication is an array of (["question", ...], "response")
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 fn test_client<F>(
     communication: &'static [(&'static str, &'static str)],
     process: F,
@@ -51,14 +51,14 @@ where
     Ok(())
 }
 
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 const SET_CLIENT_COMMUNICATION: (&str, &str) = (
     "SET self CLIENT_NAME test:test:main\r\n",
     "208 OK CLIENT NAME SET\r\n",
 );
 
 #[test]
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 fn connect_and_quit() -> io::Result<()> {
     test_client(
         &[
@@ -73,7 +73,7 @@ fn connect_and_quit() -> io::Result<()> {
 }
 
 #[test]
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 fn say_one_line() -> io::Result<()> {
     test_client(
         &[
@@ -105,7 +105,7 @@ fn say_one_line() -> io::Result<()> {
 macro_rules! test_setter {
     ($setter:ident, $question:expr, $answer:expr, $code:expr, $($arg:tt)*) => {
         #[test]
-        #[cfg(not(feature = "metal-io"))]
+        #[cfg(not(feature = "async-mio"))]
         fn $setter() -> io::Result<()> {
             test_client(
                 &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
@@ -119,14 +119,14 @@ macro_rules! test_setter {
 }
 
 macro_rules! test_getter {
-    ($getter:ident, $receive:ident, $question:expr, $answer:expr, $value:expr) => {
+    ($getter:ident, $receive:ident, $arg:tt, $question:expr, $answer:expr, $value:expr) => {
         #[test]
-        #[cfg(not(feature = "metal-io"))]
+        #[cfg(not(feature = "async-mio"))]
         fn $getter() -> io::Result<()> {
             test_client(
                 &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
                 |client| {
-                    let value = client.$getter().unwrap().$receive(251).unwrap();
+                    let value = client.$getter().unwrap().$receive $arg.unwrap();
                     assert_eq!($value, value);
                     Ok(())
                 },
@@ -134,14 +134,14 @@ macro_rules! test_getter {
         }
     };
     ($getter:ident, $question:expr, $answer:expr, $value:expr) => {
-        test_getter!($getter, receive_string, $question, $answer, $value);
+        test_getter!($getter, receive_string, (OK_GET), $question, $answer, $value);
     };
 }
 
 macro_rules! test_list {
     ($getter:ident, $question:expr, $answer:expr, $code:expr, $values:expr) => {
         #[test]
-        #[cfg(not(feature = "metal-io"))]
+        #[cfg(not(feature = "async-mio"))]
         fn $getter() -> io::Result<()> {
             test_client(
                 &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
@@ -164,7 +164,7 @@ test_setter!(
 );
 
 #[test]
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 fn set_debug() -> io::Result<()> {
     test_client(
         &[
@@ -238,6 +238,7 @@ test_setter!(
 test_getter!(
     get_rate,
     receive_u8,
+    (),
     "GET RATE\r\n",
     "251-0\r\n251 OK GET RETURNED\r\n",
     0
@@ -255,6 +256,7 @@ test_setter!(
 test_getter!(
     get_volume,
     receive_u8,
+    (),
     "GET VOLUME\r\n",
     "251-100\r\n251 OK GET RETURNED\r\n",
     100
@@ -263,6 +265,7 @@ test_getter!(
 test_getter!(
     get_pitch,
     receive_u8,
+    (),
     "GET PITCH\r\n",
     "251-0\r\n251 OK GET RETURNED\r\n",
     0
@@ -337,7 +340,7 @@ test_list!(
 );
 
 #[test]
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 fn list_synthesis_voices() -> io::Result<()> {
     test_client(
         &[
@@ -363,7 +366,7 @@ fn list_synthesis_voices() -> io::Result<()> {
 }
 
 #[test]
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 fn receive_notification() -> io::Result<()> {
     test_client(
         &[

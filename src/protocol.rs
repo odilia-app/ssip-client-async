@@ -21,14 +21,17 @@ macro_rules! invalid_input {
     };
 }
 
+/// Write lines separated by CRLF.
 pub(crate) fn write_lines(output: &mut dyn Write, lines: &[&str]) -> ClientResult<()> {
     for line in lines.iter() {
+        // Uncomment to debug: dbg!(line.to_owned());
         output.write_all(line.as_bytes())?;
         output.write_all(b"\r\n")?;
     }
     Ok(())
 }
 
+/// Write lines separated by CRLF and flush the output.
 pub(crate) fn send_lines(output: &mut dyn Write, lines: &[&str]) -> ClientResult<()> {
     write_lines(output, lines)?;
     output.flush()?;
@@ -53,6 +56,7 @@ fn parse_status_line(code: u16, line: &str) -> ClientStatus {
     }
 }
 
+/// Read lines from server until a status line is found.
 pub(crate) fn receive_answer(
     input: &mut dyn BufRead,
     mut lines: Option<&mut Vec<String>>,
@@ -60,6 +64,7 @@ pub(crate) fn receive_answer(
     loop {
         let mut line = String::new();
         input.read_line(&mut line).map_err(ClientError::Io)?;
+        // Uncomment to debug: dbg!(line.to_owned());
         match line.chars().nth(3) {
             Some(ch) => match ch {
                 ' ' => match line[0..3].parse::<u16>() {

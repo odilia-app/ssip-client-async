@@ -50,7 +50,7 @@ impl FifoPath {
     }
 }
 
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 mod synchronous {
     use std::io::{self, BufReader, BufWriter};
     pub use std::os::unix::net::UnixStream;
@@ -96,10 +96,10 @@ mod synchronous {
     }
 }
 
-#[cfg(not(feature = "metal-io"))]
+#[cfg(not(feature = "async-mio"))]
 pub use synchronous::{FifoBuilder, UnixStream};
 
-#[cfg(feature = "metal-io")]
+#[cfg(feature = "async-mio")]
 mod asynchronous {
     pub use mio::net::UnixStream;
     use std::io::{self, BufReader, BufWriter};
@@ -146,7 +146,7 @@ mod asynchronous {
     }
 }
 
-#[cfg(feature = "metal-io")]
+#[cfg(feature = "async-mio")]
 pub use asynchronous::{FifoBuilder, UnixStream};
 
 #[cfg(test)]
