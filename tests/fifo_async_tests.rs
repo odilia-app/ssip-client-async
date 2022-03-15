@@ -84,15 +84,13 @@ fn basic_async_communication() -> std::io::Result<()> {
         while controler.step() < 2 {
             poll.poll(&mut events, None)?;
             for event in &events {
-                if event.token() == output_token && event.is_writable() {
-                    if controler.step() == 0 {
-                        controler
-                            .check_result(client.set_client_name(ClientName::new("test", "test")));
-                    }
-                } else if event.token() == input_token && event.is_readable() {
-                    if controler.step() == 1 {
-                        controler.check_result(client.check_client_name_set());
-                    }
+                if event.token() == output_token && event.is_writable() && controler.step() == 0 {
+                    controler.check_result(client.set_client_name(ClientName::new("test", "test")));
+                } else if event.token() == input_token
+                    && event.is_readable()
+                    && controler.step() == 1
+                {
+                    controler.check_result(client.check_client_name_set());
                 }
             }
         }

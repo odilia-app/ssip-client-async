@@ -115,7 +115,7 @@ mod asynchronous {
     }
 
     impl FifoBuilder {
-        pub fn new() -> FifoBuilder {
+        pub fn new() -> Self {
             FifoBuilder {
                 path: FifoPath::new(),
             }
@@ -148,6 +148,12 @@ mod asynchronous {
 
 #[cfg(feature = "async-mio")]
 pub use asynchronous::{FifoBuilder, UnixStream};
+
+impl Default for FifoBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(test)]
 mod tests {
