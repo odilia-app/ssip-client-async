@@ -6,96 +6,21 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-use std::io::{self, BufRead, BufReader, BufWriter, Write};
-use std::path::{Path, PathBuf};
-use std::thread;
-
-use std::os::unix::net::UnixListener;
-
 #[cfg(not(feature = "metal-io"))]
-use std::os::unix::net::UnixStream;
-
-#[cfg(feature = "metal-io")]
-use mio::net::UnixStream;
-
 use ssip_client::*;
-
-struct Server {
-    listener: UnixListener,
-    communication: Vec<(&'static [&'static str], &'static str)>,
-}
-
-impl Server {
-    fn new<P>(
-        socket_path: &P,
-        communication: &[(&'static [&'static str], &'static str)],
-    ) -> io::Result<Self>
-    where
-        P: AsRef<Path>,
-    {
-        let listener = UnixListener::bind(socket_path)?;
-        Ok(Server {
-            listener,
-            communication: communication.to_vec(),
-        })
-    }
-
-    fn serve(&mut self) -> io::Result<()> {
-        let (stream, _) = self.listener.accept()?;
-        let mut input = BufReader::new(stream.try_clone()?);
-        let mut output = BufWriter::new(stream);
-        for (questions, answer) in self.communication.iter() {
-            for question in questions.iter() {
-                let mut line = String::new();
-                input.read_line(&mut line)?;
-                if line != *question {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("read <{}> instead of <{}>", dbg!(line), *question),
-                    ));
-                }
-            }
-            output.write_all(answer.as_bytes())?;
-            output.flush()?;
-        }
-        Ok(())
-    }
-
-    fn temporary_path() -> PathBuf {
-        let tid = unsafe { libc::pthread_self() } as u64;
-        std::env::temp_dir().join(format!("ssip-client-test-{}-{}", std::process::id(), tid))
-    }
-
-    fn run<P>(
-        socket_path: P,
-        communication: &'static [(&'static [&'static str], &'static str)],
-    ) -> thread::JoinHandle<io::Result<()>>
-    where
-        P: AsRef<Path>,
-    {
-        let server_path = socket_path.as_ref().to_path_buf();
-        let mut server = Server::new(&server_path, communication).unwrap();
-        thread::spawn(move || -> io::Result<()> {
-            server.serve()?;
-            Ok(())
-        })
-    }
-}
+#[cfg(not(feature = "metal-io"))]
+use std::{io, os::unix::net::UnixStream};
 
 #[cfg(not(feature = "metal-io"))]
-pub fn new_fifo_client<P>(socket_path: P) -> ClientResult<Client<UnixStream>>
-where
-    P: AsRef<Path>,
-{
-    ssip_client::new_fifo_client(&socket_path, None)
-}
+mod server;
 
-#[cfg(feature = "metal-io")]
-use ssip_client::new_fifo_client;
+#[cfg(not(feature = "metal-io"))]
+use server::Server;
 
 /// Create a server and run the client
 ///
 /// The communication is an array of (["question", ...], "response")
+#[cfg(not(feature = "metal-io"))]
 fn test_client<F>(
     communication: &'static [(&'static [&'static str], &'static str)],
     process: F,
@@ -109,7 +34,7 @@ where
     let mut process_wrapper = std::panic::AssertUnwindSafe(process);
     let result = std::panic::catch_unwind(move || {
         let handle = Server::run(&server_path, communication);
-        let mut client = new_fifo_client(&server_path).unwrap();
+        let mut client = ssip_client::new_fifo_client(&server_path, None).unwrap();
         client
             .set_client_name(ClientName::new("test", "test"))
             .unwrap()
@@ -123,12 +48,14 @@ where
     Ok(())
 }
 
+#[cfg(not(feature = "metal-io"))]
 const SET_CLIENT_COMMUNICATION: (&[&str], &str) = (
     &["SET self CLIENT_NAME test:test:main\r\n"],
     "208 OK CLIENT NAME SET\r\n",
 );
 
 #[test]
+#[cfg(not(feature = "metal-io"))]
 fn connect_and_quit() -> io::Result<()> {
     test_client(
         &[
@@ -143,6 +70,7 @@ fn connect_and_quit() -> io::Result<()> {
 }
 
 #[test]
+#[cfg(not(feature = "metal-io"))]
 fn say_one_line() -> io::Result<()> {
     test_client(
         &[
@@ -174,6 +102,7 @@ fn say_one_line() -> io::Result<()> {
 macro_rules! test_setter {
     ($setter:ident, $question:expr, $answer:expr, $code:expr, $($arg:tt)*) => {
         #[test]
+        #[cfg(not(feature = "metal-io"))]
         fn $setter() -> io::Result<()> {
             test_client(
                 &[SET_CLIENT_COMMUNICATION, (&[$question], $answer)],
@@ -189,6 +118,7 @@ macro_rules! test_setter {
 macro_rules! test_getter {
     ($getter:ident, $receive:ident, $question:expr, $answer:expr, $value:expr) => {
         #[test]
+        #[cfg(not(feature = "metal-io"))]
         fn $getter() -> io::Result<()> {
             test_client(
                 &[SET_CLIENT_COMMUNICATION, (&[$question], $answer)],
@@ -208,6 +138,7 @@ macro_rules! test_getter {
 macro_rules! test_list {
     ($getter:ident, $question:expr, $answer:expr, $code:expr, $values:expr) => {
         #[test]
+        #[cfg(not(feature = "metal-io"))]
         fn $getter() -> io::Result<()> {
             test_client(
                 &[SET_CLIENT_COMMUNICATION, (&[$question], $answer)],
@@ -230,6 +161,7 @@ test_setter!(
 );
 
 #[test]
+#[cfg(not(feature = "metal-io"))]
 fn set_debug() -> io::Result<()> {
     test_client(
         &[
@@ -402,6 +334,7 @@ test_list!(
 );
 
 #[test]
+#[cfg(not(feature = "metal-io"))]
 fn list_synthesis_voices() -> io::Result<()> {
     test_client(
         &[
@@ -427,6 +360,7 @@ fn list_synthesis_voices() -> io::Result<()> {
 }
 
 #[test]
+#[cfg(not(feature = "metal-io"))]
 fn receive_notification() -> io::Result<()> {
     test_client(
         &[

@@ -27,6 +27,8 @@ pub enum ClientError {
     Io(io::Error),
     #[error("No line in result")]
     NoLine,
+    #[error("Not ready")]
+    NotReady,
     #[error("SSIP: {0}")]
     Ssip(StatusLine),
     #[error("Too many lines")]
@@ -39,7 +41,11 @@ pub enum ClientError {
 
 impl From<io::Error> for ClientError {
     fn from(err: io::Error) -> Self {
-        ClientError::Io(err)
+        if err.kind() == io::ErrorKind::WouldBlock {
+            ClientError::NotReady
+        } else {
+            ClientError::Io(err)
+        }
     }
 }
 
