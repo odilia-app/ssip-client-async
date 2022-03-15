@@ -1,6 +1,5 @@
 use ssip_client::{
-    ClientName, ClientResult, SynthesisVoice, OK_CLIENT_NAME_SET, OK_OUTPUT_MODULES_LIST_SENT,
-    OK_VOICES_LIST_SENT,
+    ClientName, ClientResult, SynthesisVoice, OK_OUTPUT_MODULES_LIST_SENT, OK_VOICES_LIST_SENT,
 };
 
 fn voice_to_string(voice: &SynthesisVoice) -> String {
@@ -23,8 +22,8 @@ fn print_list(title: &str, values: &[String]) {
 fn main() -> ClientResult<()> {
     let mut client = ssip_client::new_default_fifo_client(None)?;
     client
-        .open(ClientName::new("joe", "list"))?
-        .check_status(OK_CLIENT_NAME_SET)?;
+        .set_client_name(ClientName::new("joe", "list"))?
+        .check_client_name_set()?;
 
     const OUTPUT_MODULE_TITLE: &str = "output modules";
     let modules = client

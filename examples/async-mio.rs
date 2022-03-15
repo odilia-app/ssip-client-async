@@ -15,7 +15,7 @@ fn main() -> ClientResult<()> {
         for event in &events {
             if event.token() == token && event.is_writable() {
                 println!("opening client");
-                match client.open(ClientName::new("joe", "hello")) {
+                match client.set_client_name(ClientName::new("joe", "hello")) {
                     Ok(()) => {
                         is_opened = true;
                         break;

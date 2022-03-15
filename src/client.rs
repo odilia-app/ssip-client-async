@@ -11,7 +11,7 @@ use std::io::{self, Read, Write};
 use std::str::FromStr;
 use thiserror::Error as ThisError;
 
-use crate::constants::{OK_MESSAGE_QUEUED, OK_VOICES_LIST_SENT};
+use crate::constants::*;
 use crate::protocol::{send_lines, write_lines};
 use crate::types::{
     CapitalLettersRecognitionMode, ClientScope, Event, KeyName, MessageId, MessageScope,
@@ -189,6 +189,7 @@ impl<S: Read + Write + Source> Client<S> {
         })
     }
 
+    /// Return the only string in the list or an error if there is no line or too many.
     fn parse_single_value(lines: &[String]) -> ClientResult<String> {
         match lines.len() {
             0 => Err(ClientError::NoLine),
@@ -197,7 +198,8 @@ impl<S: Read + Write + Source> Client<S> {
         }
     }
 
-    pub fn open(&mut self, client_name: ClientName) -> ClientResult<&mut Client<S>> {
+    /// Set the client name. It must be the first call on startup.
+    pub fn set_client_name(&mut self, client_name: ClientName) -> ClientResult<&mut Client<S>> {
         send_lines(
             &mut self.output,
             &[format!(
@@ -535,6 +537,12 @@ impl<S: Read + Write + Source> Client<S> {
         })
     }
 
+    /// Check the result of `set_client_name`.
+    pub fn check_client_name_set(&mut self) -> ClientResult<&mut Client<S>> {
+        self.check_status(OK_CLIENT_NAME_SET)
+    }
+
+    /// Register the socket for polling.
     #[cfg(feature = "metal-io")]
     pub fn register(&mut self, poll: &mio::Poll, token: mio::Token) -> ClientResult<()> {
         poll.registry().register(

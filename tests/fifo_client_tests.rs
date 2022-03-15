@@ -111,9 +111,9 @@ where
         let handle = Server::run(&server_path, communication);
         let mut client = new_fifo_client(&server_path).unwrap();
         client
-            .open(ClientName::new("test", "test"))
+            .set_client_name(ClientName::new("test", "test"))
             .unwrap()
-            .check_status(OK_CLIENT_NAME_SET)
+            .check_client_name_set()
             .unwrap();
         process_wrapper(&mut client).unwrap();
         handle.join().unwrap()
