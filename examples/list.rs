@@ -1,26 +1,29 @@
+#[cfg(not(feature = "metal-io"))]
 use ssip_client::{
-    ClientName, ClientResult, SynthesisVoice, OK_OUTPUT_MODULES_LIST_SENT, OK_VOICES_LIST_SENT,
+    ClientName, ClientResult, FifoBuilder, SynthesisVoice, OK_OUTPUT_MODULES_LIST_SENT,
+    OK_VOICES_LIST_SENT,
 };
 
-fn voice_to_string(voice: &SynthesisVoice) -> String {
-    match &voice.language {
-        Some(language) => match &voice.dialect {
-            Some(dialect) => format!("{} [{}_{}]", voice.name, language, dialect),
-            None => format!("{} [{}]", voice.name, language),
-        },
-        None => format!("{}", voice.name),
-    }
-}
-
-fn print_list(title: &str, values: &[String]) {
-    println!("{}:", title);
-    for val in values {
-        println!("- {}", val);
-    }
-}
-
+#[cfg(not(feature = "metal-io"))]
 fn main() -> ClientResult<()> {
-    let mut client = ssip_client::new_default_fifo_client(None)?;
+    fn voice_to_string(voice: &SynthesisVoice) -> String {
+        match &voice.language {
+            Some(language) => match &voice.dialect {
+                Some(dialect) => format!("{} [{}_{}]", voice.name, language, dialect),
+                None => format!("{} [{}]", voice.name, language),
+            },
+            None => format!("{}", voice.name),
+        }
+    }
+
+    fn print_list(title: &str, values: &[String]) {
+        println!("{}:", title);
+        for val in values {
+            println!("- {}", val);
+        }
+    }
+
+    let mut client = FifoBuilder::new().build()?;
     client
         .set_client_name(ClientName::new("joe", "list"))?
         .check_client_name_set()?;
@@ -49,4 +52,9 @@ fn main() -> ClientResult<()> {
 
     client.quit().unwrap();
     Ok(())
+}
+
+#[cfg(feature = "metal-io")]
+fn main() {
+    println!("asynchronous client not implemented");
 }

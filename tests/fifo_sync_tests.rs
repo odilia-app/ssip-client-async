@@ -34,7 +34,10 @@ where
     let mut process_wrapper = std::panic::AssertUnwindSafe(process);
     let result = std::panic::catch_unwind(move || {
         let handle = Server::run(&server_path, communication);
-        let mut client = ssip_client::new_fifo_client(&server_path, None).unwrap();
+        let mut client = ssip_client::FifoBuilder::new()
+            .path(&server_path)
+            .build()
+            .unwrap();
         client
             .set_client_name(ClientName::new("test", "test"))
             .unwrap()
@@ -377,7 +380,7 @@ fn receive_notification() -> io::Result<()> {
                 client
                     .speak()
                     .unwrap()
-                    .check_status(OK_RECEIVING_DATA)
+                    .check_receiving_data()
                     .unwrap()
                     .send_line("Hello, world")
                     .unwrap()

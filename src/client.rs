@@ -162,37 +162,16 @@ macro_rules! client_send_range {
 }
 
 /// SSIP client on generic stream
-#[cfg(not(feature = "metal-io"))]
-pub struct Client<S: Read + Write> {
-    input: io::BufReader<S>,
-    output: io::BufWriter<S>,
-}
-
-#[cfg(feature = "metal-io")]
 pub struct Client<S: Read + Write + Source> {
     input: io::BufReader<S>,
     output: io::BufWriter<S>,
-    socket: S,
 }
 
 impl<S: Read + Write + Source> Client<S> {
-    #[cfg(not(feature = "metal-io"))]
-    pub(crate) fn new(input: io::BufReader<S>, output: io::BufWriter<S>) -> ClientResult<Self> {
+    /// Create a SSIP client on the reader and writer.
+    pub(crate) fn new(input: io::BufReader<S>, output: io::BufWriter<S>) -> Self {
         // https://stackoverflow.com/questions/58467659/how-to-store-tcpstream-with-bufreader-and-bufwriter-in-a-data-structure
-        Ok(Self { input, output })
-    }
-
-    #[cfg(feature = "metal-io")]
-    pub(crate) fn new(
-        input: io::BufReader<S>,
-        output: io::BufWriter<S>,
-        socket: S,
-    ) -> ClientResult<Self> {
-        Ok(Self {
-            socket,
-            input,
-            output,
-        })
+        Self { input, output }
     }
 
     /// Return the only string in the list or an error if there is no line or too many.
@@ -548,14 +527,18 @@ impl<S: Read + Write + Source> Client<S> {
         self.check_status(OK_CLIENT_NAME_SET)
     }
 
+    /// Check if server accept data.
+    pub fn check_receiving_data(&mut self) -> ClientResult<&mut Client<S>> {
+        self.check_status(OK_RECEIVING_DATA)
+    }
+
     /// Register the socket for polling.
     #[cfg(feature = "metal-io")]
     pub fn register(&mut self, poll: &mio::Poll, token: mio::Token) -> ClientResult<()> {
-        poll.registry().register(
-            &mut self.socket,
-            token,
-            mio::Interest::READABLE | mio::Interest::WRITABLE,
-        )?;
+        poll.registry()
+            .register(self.output.get_mut(), token, mio::Interest::WRITABLE)?;
+        poll.registry()
+            .register(self.input.get_mut(), token, mio::Interest::READABLE)?;
         Ok(())
     }
 }

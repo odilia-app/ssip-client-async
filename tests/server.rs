@@ -49,10 +49,16 @@ impl Server {
         let (stream, _) = self.listener.accept()?;
         let mut input = BufReader::new(stream.try_clone()?);
         let mut output = BufWriter::new(stream);
+        let mut log_file = std::fs::File::create("/home/laurent/tmp/test_server.log")?;
         for (questions, answer) in self.communication.iter() {
+            log_file.write_all(format!("Next answer: {}", answer).as_bytes())?;
             for question in Server::split_lines(questions).iter() {
+                log_file.write_all(format!("Expecting: {}", question).as_bytes())?;
+                log_file.flush()?;
                 let mut line = String::new();
                 input.read_line(&mut line)?;
+                log_file.write_all(format!("Read: {}", line).as_bytes())?;
+                log_file.flush()?;
                 if line != *question {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
@@ -60,8 +66,12 @@ impl Server {
                     ));
                 }
             }
+            log_file.write_all(format!("Write: {}", answer).as_bytes())?;
+            log_file.flush()?;
             output.write_all(answer.as_bytes())?;
             output.flush()?;
+            log_file.write_all(b"Flushed\r\n")?;
+            log_file.flush()?;
         }
         Ok(())
     }

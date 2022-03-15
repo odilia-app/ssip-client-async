@@ -21,7 +21,3 @@ libc = "0"
 
 [features]
 metal-io = ["mio/net", "mio/os-poll"]
-
-[[example]]
-name = "async-mio"
-required-features = ["metal-io"]

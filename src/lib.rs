@@ -1,5 +1,5 @@
 // ssip-client -- Speech Dispatcher client in Rust
-// Copyright (c) 2021 Laurent Pelecq
+// Copyright (c) 2021-2022 Laurent Pelecq
 //
 // Licensed under the Apache License, Version 2.0
 // <LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
@@ -16,8 +16,8 @@
 //!
 //! Example
 //! ```no_run
-//! use ssip_client::{new_default_fifo_client, ClientName, OK_CLIENT_NAME_SET};
-//! let mut client = new_default_fifo_client(None)?;
+//! use ssip_client::{FifoBuilder, ClientName, OK_CLIENT_NAME_SET};
+//! let mut client = FifoBuilder::new().build()?;
 //! client
 //!     .set_client_name(ClientName::new("joe", "hello"))?
 //!     .check_client_name_set()?;
@@ -36,6 +36,6 @@ mod types;
 
 pub use client::{Client, ClientError, ClientName, ClientResult, ClientStatus};
 pub use constants::*;
-pub use fifo::{new_default_fifo_client, new_fifo_client};
+pub use fifo::FifoBuilder;
 pub use types::StatusLine;
 pub use types::*;

@@ -8,99 +8,156 @@
 // modified, or distributed except according to those terms.
 
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const SPEECHD_APPLICATION_NAME: &str = "speech-dispatcher";
 const SPEECHD_SOCKET_NAME: &str = "speechd.sock";
 
-/// Return the standard socket according to the [freedesktop.org](https://www.freedesktop.org/) specification.
-fn speech_dispatcher_socket() -> io::Result<PathBuf> {
-    match dirs::runtime_dir() {
-        Some(runtime_dir) => Ok(runtime_dir
-            .join(SPEECHD_APPLICATION_NAME)
-            .join(SPEECHD_SOCKET_NAME)),
-        None => Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            "unix socket not found",
-        )),
+struct FifoPath {
+    path: Option<PathBuf>,
+}
+
+impl FifoPath {
+    fn new() -> FifoPath {
+        FifoPath { path: None }
+    }
+
+    fn set<P>(&mut self, path: P)
+    where
+        P: AsRef<Path>,
+    {
+        self.path = Some(path.as_ref().to_path_buf());
+    }
+
+    /// Return the standard socket according to the [freedesktop.org](https://www.freedesktop.org/) specification.
+    fn default_path() -> io::Result<PathBuf> {
+        match dirs::runtime_dir() {
+            Some(runtime_dir) => Ok(runtime_dir
+                .join(SPEECHD_APPLICATION_NAME)
+                .join(SPEECHD_SOCKET_NAME)),
+            None => Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "unix socket not found",
+            )),
+        }
+    }
+
+    fn get(&self) -> io::Result<PathBuf> {
+        match &self.path {
+            Some(path) => Ok(path.to_path_buf()),
+            _ => FifoPath::default_path(),
+        }
     }
 }
 
 #[cfg(not(feature = "metal-io"))]
 mod synchronous {
-    use std::io::{BufReader, BufWriter};
+    use std::io::{self, BufReader, BufWriter};
     pub use std::os::unix::net::UnixStream;
     use std::path::Path;
     use std::time::Duration;
 
-    use crate::client::{Client, ClientResult};
+    use crate::client::Client;
 
-    /// New FIFO client
-    pub fn new_fifo_client<P>(
-        socket_path: P,
+    use super::FifoPath;
+
+    pub struct FifoBuilder {
+        path: FifoPath,
         read_timeout: Option<Duration>,
-    ) -> ClientResult<Client<UnixStream>>
-    where
-        P: AsRef<Path>,
-    {
-        let stream = UnixStream::connect(socket_path.as_ref())?;
-        stream.set_read_timeout(read_timeout)?;
-        Client::new(BufReader::new(stream.try_clone()?), BufWriter::new(stream))
     }
 
-    /// New FIFO client on the standard socket `${XDG_RUNTIME_DIR}/speech-dispatcher/speechd.sock`
-    pub fn new_default_fifo_client(
-        read_timeout: Option<Duration>,
-    ) -> ClientResult<Client<UnixStream>> {
-        let socket_path = super::speech_dispatcher_socket()?;
-        new_fifo_client(socket_path.as_path(), read_timeout)
+    impl FifoBuilder {
+        pub fn new() -> FifoBuilder {
+            FifoBuilder {
+                path: FifoPath::new(),
+                read_timeout: None,
+            }
+        }
+
+        pub fn path<P>(&mut self, socket_path: P) -> &mut FifoBuilder
+        where
+            P: AsRef<Path>,
+        {
+            self.path.set(socket_path);
+            self
+        }
+
+        pub fn timeout(&mut self, read_timeout: Duration) -> &mut FifoBuilder {
+            self.read_timeout = Some(read_timeout);
+            self
+        }
+
+        pub fn build(&self) -> io::Result<Client<UnixStream>> {
+            let input = UnixStream::connect(self.path.get()?)?;
+            input.set_read_timeout(self.read_timeout)?;
+            let output = input.try_clone()?;
+            Ok(Client::new(BufReader::new(input), BufWriter::new(output)))
+        }
     }
 }
 
 #[cfg(not(feature = "metal-io"))]
-pub use synchronous::{new_default_fifo_client, new_fifo_client, UnixStream};
+pub use synchronous::{FifoBuilder, UnixStream};
 
 #[cfg(feature = "metal-io")]
 mod asynchronous {
     pub use mio::net::UnixStream;
-    use std::io::{BufReader, BufWriter};
+    use std::io::{self, BufReader, BufWriter};
     use std::os::unix::net::UnixStream as StdUnixStream;
     use std::path::Path;
 
-    use crate::client::{Client, ClientResult};
+    use crate::client::Client;
 
-    /// New FIFO client
-    pub fn new_fifo_client<P>(socket_path: P) -> ClientResult<Client<UnixStream>>
-    where
-        P: AsRef<Path>,
-    {
-        let stream = StdUnixStream::connect(socket_path.as_ref())?;
-        stream.set_nonblocking(true)?;
-        Client::new(
-            BufReader::new(UnixStream::from_std(stream.try_clone()?)),
-            BufWriter::new(UnixStream::from_std(stream.try_clone()?)),
-            UnixStream::from_std(stream),
-        )
+    use super::FifoPath;
+
+    pub struct FifoBuilder {
+        path: FifoPath,
     }
 
-    /// New FIFO client on the standard socket `${XDG_RUNTIME_DIR}/speech-dispatcher/speechd.sock`
-    pub fn new_default_fifo_client() -> ClientResult<Client<UnixStream>> {
-        let socket_path = super::speech_dispatcher_socket()?;
-        new_fifo_client(socket_path.as_path())
+    impl FifoBuilder {
+        pub fn new() -> FifoBuilder {
+            FifoBuilder {
+                path: FifoPath::new(),
+            }
+        }
+
+        fn non_blocking(socket: StdUnixStream) -> io::Result<StdUnixStream> {
+            socket.set_nonblocking(true)?;
+            Ok(socket)
+        }
+
+        pub fn path<P>(&mut self, socket_path: P) -> &mut FifoBuilder
+        where
+            P: AsRef<Path>,
+        {
+            self.path.set(socket_path);
+            self
+        }
+
+        pub fn build(&self) -> io::Result<Client<UnixStream>> {
+            let stream = StdUnixStream::connect(self.path.get()?)?;
+            Ok(Client::new(
+                BufReader::new(UnixStream::from_std(FifoBuilder::non_blocking(
+                    stream.try_clone()?,
+                )?)),
+                BufWriter::new(UnixStream::from_std(FifoBuilder::non_blocking(stream)?)),
+            ))
+        }
     }
 }
 
 #[cfg(feature = "metal-io")]
-pub use asynchronous::{new_default_fifo_client, new_fifo_client, UnixStream};
+pub use asynchronous::{FifoBuilder, UnixStream};
 
 #[cfg(test)]
 mod tests {
 
     #[test]
-    fn test_speech_dispatcher_socket() -> std::io::Result<()> {
+    fn test_fifo_path() -> std::io::Result<()> {
         if std::env::var("XDG_RUNTIME_DIR").is_ok() {
-            let socket_path = super::speech_dispatcher_socket()?;
+            let socket_path = super::FifoPath::new();
             assert!(socket_path
+                .get()?
                 .to_str()
                 .unwrap()
                 .ends_with("/speech-dispatcher/speechd.sock"));

@@ -1,7 +1,9 @@
-use ssip_client::{ClientName, ClientResult, EventType, NotificationType};
+#[cfg(not(feature = "metal-io"))]
+use ssip_client::{ClientName, ClientResult, EventType, FifoBuilder, NotificationType};
 
+#[cfg(not(feature = "metal-io"))]
 fn main() -> ClientResult<()> {
-    let mut client = ssip_client::new_default_fifo_client(None)?;
+    let mut client = FifoBuilder::new().build()?;
     client
         .set_client_name(ClientName::new("joe", "notifications"))?
         .check_client_name_set()?;
@@ -27,4 +29,9 @@ fn main() -> ClientResult<()> {
     }
     client.quit()?;
     Ok(())
+}
+
+#[cfg(feature = "metal-io")]
+fn main() {
+    println!("asynchronous client not implemented");
 }
