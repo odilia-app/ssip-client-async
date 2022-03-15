@@ -8,6 +8,8 @@ Rust SSIP Client
 
 Speech Dispatcher [SSIP client library](http://htmlpreview.github.io/?https://github.com/brailcom/speechd/blob/master/doc/ssip.html) in pure rust.
 
+- [x] Unix socket.
+- [ ] TCP socket.
 - [x] Stop, cancel, pause and resume.
 - [x] List, set voices.
 - [x] Set rate, pitch, volume.

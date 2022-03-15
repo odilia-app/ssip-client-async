@@ -16,9 +16,12 @@
 //!
 //! Example
 //! ```no_run
-//! use ssip_client::{new_default_fifo_client, ClientName};
-//! let mut client = new_default_fifo_client(&ClientName::new("joe", "hello"), None)?;
-//! let msg_id = client.say_line("hello")?;
+//! use ssip_client::{new_default_fifo_client, ClientName, OK_CLIENT_NAME_SET};
+//! let mut client = new_default_fifo_client(None)?;
+//! client
+//!     .open(ClientName::new("joe", "hello"))?
+//!     .check_status(OK_CLIENT_NAME_SET)?;
+//! let msg_id = client.speak()?.send_line("hello")?.receive_message_id()?;
 //! client.quit()?;
 //! # Ok::<(), ssip_client::ClientError>(())
 //! ```
@@ -33,7 +36,6 @@ mod types;
 
 pub use client::{Client, ClientError, ClientName, ClientResult, ClientStatus};
 pub use constants::*;
-pub use fifo::new_client as new_fifo_client;
-pub use fifo::new_default_client as new_default_fifo_client;
+pub use fifo::{new_default_fifo_client, new_fifo_client};
 pub use types::StatusLine;
 pub use types::*;

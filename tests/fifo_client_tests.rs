@@ -7,9 +7,16 @@
 // modified, or distributed except according to those terms.
 
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
-use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::thread;
+
+use std::os::unix::net::UnixListener;
+
+#[cfg(not(feature = "metal-io"))]
+use std::os::unix::net::UnixStream;
+
+#[cfg(feature = "metal-io")]
+use mio::net::UnixStream;
 
 use ssip_client::*;
 
@@ -75,6 +82,17 @@ impl Server {
     }
 }
 
+#[cfg(not(feature = "metal-io"))]
+pub fn new_fifo_client<P>(socket_path: P) -> ClientResult<Client<UnixStream>>
+where
+    P: AsRef<Path>,
+{
+    ssip_client::new_fifo_client(&socket_path, None)
+}
+
+#[cfg(feature = "metal-io")]
+use ssip_client::new_fifo_client;
+
 /// Create a server and run the client
 ///
 /// The communication is an array of (["question", ...], "response")
@@ -91,9 +109,12 @@ where
     let mut process_wrapper = std::panic::AssertUnwindSafe(process);
     let result = std::panic::catch_unwind(move || {
         let handle = Server::run(&server_path, communication);
-        let mut client =
-            ssip_client::new_fifo_client(&server_path, &ClientName::new("test", "test"), None)
-                .unwrap();
+        let mut client = new_fifo_client(&server_path).unwrap();
+        client
+            .open(ClientName::new("test", "test"))
+            .unwrap()
+            .check_status(OK_CLIENT_NAME_SET)
+            .unwrap();
         process_wrapper(&mut client).unwrap();
         handle.join().unwrap()
     });
@@ -115,7 +136,7 @@ fn connect_and_quit() -> io::Result<()> {
             (&["QUIT\r\n"], "231 HAPPY HACKING\r\n"),
         ],
         |client| {
-            assert_eq!(OK_BYE, client.quit().unwrap().code);
+            client.quit().unwrap().check_status(OK_BYE).unwrap();
             Ok(())
         },
     )
@@ -133,7 +154,18 @@ fn say_one_line() -> io::Result<()> {
             ),
         ],
         |client| {
-            assert_eq!("21", client.say_line("Hello, world").unwrap(),);
+            assert_eq!(
+                "21",
+                client
+                    .speak()
+                    .unwrap()
+                    .check_status(OK_RECEIVING_DATA)
+                    .unwrap()
+                    .send_line("Hello, world")
+                    .unwrap()
+                    .receive_message_id()
+                    .unwrap()
+            );
             Ok(())
         },
     )
@@ -146,8 +178,7 @@ macro_rules! test_setter {
             test_client(
                 &[SET_CLIENT_COMMUNICATION, (&[$question], $answer)],
                 |client| {
-                    let status = client.$setter($($arg)*).unwrap();
-                    assert_eq!($code, status.code);
+                    client.$setter($($arg)*).unwrap().check_status($code).unwrap();
                     Ok(())
                 },
             )
@@ -156,29 +187,32 @@ macro_rules! test_setter {
 }
 
 macro_rules! test_getter {
-    ($getter:ident, $question:expr, $answer:expr, $value:expr) => {
+    ($getter:ident, $receive:ident, $question:expr, $answer:expr, $value:expr) => {
         #[test]
         fn $getter() -> io::Result<()> {
             test_client(
                 &[SET_CLIENT_COMMUNICATION, (&[$question], $answer)],
                 |client| {
-                    let value = client.$getter().unwrap();
+                    let value = client.$getter().unwrap().$receive(251).unwrap();
                     assert_eq!($value, value);
                     Ok(())
                 },
             )
         }
     };
+    ($getter:ident, $question:expr, $answer:expr, $value:expr) => {
+        test_getter!($getter, receive_string, $question, $answer, $value);
+    };
 }
 
 macro_rules! test_list {
-    ($getter:ident, $question:expr, $answer:expr, $values:expr) => {
+    ($getter:ident, $question:expr, $answer:expr, $code:expr, $values:expr) => {
         #[test]
         fn $getter() -> io::Result<()> {
             test_client(
                 &[SET_CLIENT_COMMUNICATION, (&[$question], $answer)],
                 |client| {
-                    let values = client.$getter().unwrap();
+                    let values = client.$getter().unwrap().receive_lines($code).unwrap();
                     assert_eq!($values, values.as_slice());
                     Ok(())
                 },
@@ -206,7 +240,11 @@ fn set_debug() -> io::Result<()> {
             ),
         ],
         |client| {
-            let output = client.set_debug(true).unwrap();
+            let output = client
+                .set_debug(true)
+                .unwrap()
+                .receive_string(OK_DEBUG_SET)
+                .unwrap();
             assert_eq!("/run/user/100/speech-dispatcher/log/debug", output);
             Ok(())
         },
@@ -233,6 +271,7 @@ test_list!(
     list_output_modules,
     "LIST OUTPUT_MODULES\r\n",
     "250-espeak-ng\r\n250-festival\r\n250 OK MODULE LIST SENT\r\n",
+    250,
     &["espeak-ng", "festival"]
 );
 
@@ -263,6 +302,7 @@ test_setter!(
 
 test_getter!(
     get_rate,
+    receive_u8,
     "GET RATE\r\n",
     "251-0\r\n251 OK GET RETURNED\r\n",
     0
@@ -279,6 +319,7 @@ test_setter!(
 
 test_getter!(
     get_volume,
+    receive_u8,
     "GET VOLUME\r\n",
     "251-100\r\n251 OK GET RETURNED\r\n",
     100
@@ -286,6 +327,7 @@ test_getter!(
 
 test_getter!(
     get_pitch,
+    receive_u8,
     "GET PITCH\r\n",
     "251-0\r\n251 OK GET RETURNED\r\n",
     0
@@ -355,6 +397,7 @@ test_list!(
     list_voice_types,
     "LIST VOICES\r\n",
     "249-MALE1\r\n249-MALE2\r\n249-FEMALE1\r\n249-FEMALE2\r\n249-CHILD_MALE\r\n249-CHILD_FEMALE\r\n249 OK VOICE LIST SENT\r\n",
+    249,
     &[ "MALE1", "MALE2", "FEMALE1", "FEMALE2", "CHILD_MALE", "CHILD_FEMALE" ]
 );
 
@@ -369,7 +412,7 @@ fn list_synthesis_voices() -> io::Result<()> {
             ),
         ],
         |client| {
-            let voices = client.list_synthesis_voices().unwrap();
+            let voices = client.list_synthesis_voices().unwrap().receive_synthesis_voices().unwrap();
             let expected_voices: [SynthesisVoice; 3] = [ SynthesisVoice::new("Amharic", Some("am"), None),
                                      SynthesisVoice::new("Greek+Auntie", Some("el"), Some("Auntie")),
                                      SynthesisVoice::new("Vietnamese (Southern)+shelby", Some("vi-VN-X-SOUTH"), Some("shelby")),
@@ -395,7 +438,18 @@ fn receive_notification() -> io::Result<()> {
             ),
         ],
         |client| {
-            assert_eq!("21", client.say_line("Hello, world").unwrap(),);
+            assert_eq!(
+                "21",
+                client
+                    .speak()
+                    .unwrap()
+                    .check_status(OK_RECEIVING_DATA)
+                    .unwrap()
+                    .send_line("Hello, world")
+                    .unwrap()
+                    .receive_message_id()
+                    .unwrap()
+            );
             match client.receive_event() {
                 Ok(Event {
                     ntype: EventType::Begin,

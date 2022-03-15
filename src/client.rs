@@ -11,10 +11,11 @@ use std::io::{self, Read, Write};
 use std::str::FromStr;
 use thiserror::Error as ThisError;
 
-use crate::constants::OK_RECEIVING_DATA;
+use crate::constants::{OK_MESSAGE_QUEUED, OK_VOICES_LIST_SENT};
+use crate::protocol::{send_lines, write_lines};
 use crate::types::{
     CapitalLettersRecognitionMode, ClientScope, Event, KeyName, MessageId, MessageScope,
-    NotificationType, Priority, PunctuationMode, StatusLine, SynthesisVoice,
+    NotificationType, Priority, PunctuationMode, ReturnCode, Source, StatusLine, SynthesisVoice,
 };
 
 /// Client error, either I/O error or SSIP error.
@@ -32,6 +33,8 @@ pub enum ClientError {
     TooManyLines,
     #[error("Truncated message")]
     TruncatedMessage,
+    #[error("Unexpected status: {0}")]
+    UnexpectedStatus(ReturnCode),
 }
 
 impl From<io::Error> for ClientError {
@@ -76,20 +79,26 @@ fn on_off(value: bool) -> &'static str {
     }
 }
 
-macro_rules! client_setter {
+macro_rules! client_send {
     ($name:ident, $doc:expr, $scope:ident, $value_name:ident as $value_type:ty, $fmt:expr, $value:expr) => {
         #[doc=$doc]
-        pub fn $name(&mut self, $scope: ClientScope, $value_name: $value_type) -> ClientStatus {
+        pub fn $name(
+            &mut self,
+            $scope: ClientScope,
+            $value_name: $value_type,
+        ) -> ClientResult<&mut Client<S>> {
             let line = match $scope {
                 ClientScope::Current => format!($fmt, "self", $value),
                 ClientScope::All => format!($fmt, "all", $value),
                 ClientScope::Client(id) => format!($fmt, id, $value),
             };
-            send_lines!(&mut self.input, &mut self.output, &[line.as_str()])
+
+            send_lines(&mut self.output, &[line.as_str()])?;
+            Ok(self)
         }
     };
     ($name:ident, $doc:expr, $scope:ident, $value_name:ident as $value_type:ty, $fmt:expr) => {
-        client_setter!(
+        client_send!(
             $name,
             $doc,
             $scope,
@@ -100,24 +109,26 @@ macro_rules! client_setter {
     };
     ($name:ident, $doc:expr, $value_name:ident as $value_type:ty, $fmt:expr, $value:expr) => {
         #[doc=$doc]
-        pub fn $name(&mut self, $value_name: $value_type) -> ClientStatus {
-            send_line!(&mut self.input, &mut self.output, $fmt, $value)
+        pub fn $name(&mut self, $value_name: $value_type) -> ClientResult<&mut Client<S>> {
+            send_lines(&mut self.output, &[format!($fmt, $value).as_str()])?;
+            Ok(self)
         }
     };
     ($name:ident, $doc:expr, $value_name:ident as $value_type:ty, $fmt:expr) => {
-        client_setter!($name, $doc, $value_name as $value_type, $fmt, $value_name);
+        client_send!($name, $doc, $value_name as $value_type, $fmt, $value_name);
     };
     ($name:ident, $doc:expr, $line:expr) => {
         #[doc=$doc]
-        pub fn $name(&mut self) -> ClientStatus {
-            send_line!(&mut self.input, &mut self.output, $line)
+        pub fn $name(&mut self) -> ClientResult<&mut Client<S>> {
+            send_lines(&mut self.output, &[$line])?;
+            Ok(self)
         }
     };
 }
 
-macro_rules! client_boolean_setter {
+macro_rules! client_send_boolean {
     ($name:ident, $doc:expr, $scope:ident, $value_name:ident, $fmt:expr) => {
-        client_setter!(
+        client_send!(
             $name,
             $doc,
             $scope,
@@ -127,13 +138,13 @@ macro_rules! client_boolean_setter {
         );
     };
     ($name:ident, $doc:expr, $value_name:ident, $fmt:expr) => {
-        client_setter!($name, $doc, $value_name as bool, $fmt, on_off($value_name));
+        client_send!($name, $doc, $value_name as bool, $fmt, on_off($value_name));
     };
 }
 
-macro_rules! client_range_setter {
+macro_rules! client_send_range {
     ($name:ident, $doc:expr, $scope:ident, $value_name:ident, $fmt:expr) => {
-        client_setter!(
+        client_send!(
             $name,
             $doc,
             $scope,
@@ -144,61 +155,38 @@ macro_rules! client_range_setter {
     };
 }
 
-macro_rules! client_getter {
-    ($name:ident, $doc:expr, $line:expr) => {
-        #[doc=$doc]
-        pub fn $name(&mut self) -> ClientResult<Vec<String>> {
-            let mut result = Vec::new();
-            send_lines!(&mut self.input, &mut self.output, &[&$line], &mut result)?;
-            Ok(result)
-        }
-    };
-}
-
-macro_rules! client_single_getter {
-    ($name:ident, $doc:expr, $value_type:ty, $line:expr) => {
-        #[doc=$doc]
-        pub fn $name(&mut self) -> ClientResult<$value_type> {
-            let mut lines = Vec::new();
-            send_lines!(&mut self.input, &mut self.output, &[&$line], &mut lines)?;
-            let result = Client::<S>::parse_single_value(&lines)?
-                .parse()
-                .map_err(|_| ClientError::InvalidType)?;
-            Ok(result)
-        }
-    };
-    ($name:ident, $doc:expr, $line:expr) => {
-        #[doc=$doc]
-        pub fn $name(&mut self) -> ClientResult<String> {
-            let mut lines = Vec::new();
-            send_lines!(&mut self.input, &mut self.output, &[&$line], &mut lines)?;
-            Client::<S>::parse_single_value(&lines)
-        }
-    };
-}
-
 /// SSIP client on generic stream
+#[cfg(not(feature = "metal-io"))]
 pub struct Client<S: Read + Write> {
     input: io::BufReader<S>,
     output: io::BufWriter<S>,
 }
 
-impl<S: Read + Write> Client<S> {
-    pub(crate) fn new(
-        mut input: io::BufReader<S>,
-        mut output: io::BufWriter<S>,
-        client_name: &ClientName,
-    ) -> ClientResult<Self> {
+#[cfg(feature = "metal-io")]
+pub struct Client<S: Read + Write + Source> {
+    input: io::BufReader<S>,
+    output: io::BufWriter<S>,
+    socket: S,
+}
+
+impl<S: Read + Write + Source> Client<S> {
+    #[cfg(not(feature = "metal-io"))]
+    pub(crate) fn new(input: io::BufReader<S>, output: io::BufWriter<S>) -> ClientResult<Self> {
         // https://stackoverflow.com/questions/58467659/how-to-store-tcpstream-with-bufreader-and-bufwriter-in-a-data-structure
-        send_line!(
-            &mut input,
-            &mut output,
-            "SET self CLIENT_NAME {}:{}:{}",
-            client_name.user,
-            client_name.application,
-            client_name.component
-        )?;
         Ok(Self { input, output })
+    }
+
+    #[cfg(feature = "metal-io")]
+    pub(crate) fn new(
+        input: io::BufReader<S>,
+        output: io::BufWriter<S>,
+        socket: S,
+    ) -> ClientResult<Self> {
+        Ok(Self {
+            socket,
+            input,
+            output,
+        })
     }
 
     fn parse_single_value(lines: &[String]) -> ClientResult<String> {
@@ -209,88 +197,98 @@ impl<S: Read + Write> Client<S> {
         }
     }
 
-    /// Send text to server
-    pub fn say_text(&mut self, lines: &[&str]) -> ClientResult<MessageId> {
-        let status = send_line!(&mut self.input, &mut self.output, "SPEAK")?;
-        if status.code == OK_RECEIVING_DATA {
-            const END_OF_DATA: [&str; 1] = ["."];
-            crate::protocol::write_lines(&mut self.output, lines)?;
-            let mut answer = Vec::new();
-            send_lines!(&mut self.input, &mut self.output, &END_OF_DATA, &mut answer)?;
-            Client::<S>::parse_single_value(&answer)
-        } else {
-            Err(ClientError::Ssip(status))
-        }
+    pub fn open(&mut self, client_name: ClientName) -> ClientResult<&mut Client<S>> {
+        send_lines(
+            &mut self.output,
+            &[format!(
+                "SET self CLIENT_NAME {}:{}:{}",
+                client_name.user, client_name.application, client_name.component
+            )
+            .as_str()],
+        )?;
+        Ok(self)
     }
 
-    /// Send a single line to the server
-    pub fn say_line(&mut self, line: &str) -> ClientResult<MessageId> {
-        let lines: [&str; 1] = [line];
-        self.say_text(&lines)
+    /// Initiate communitation to send text to speak
+    pub fn speak(&mut self) -> ClientResult<&mut Client<S>> {
+        send_lines(&mut self.output, &["SPEAK"])?;
+        Ok(self)
     }
 
-    /// Send a char to the server
-    pub fn say_char(&mut self, ch: char) -> ClientResult<MessageId> {
-        let line = format!("CHAR {}", ch);
-        let mut answer = Vec::new();
-        send_lines!(&mut self.input, &mut self.output, &[&line], &mut answer)?;
-        Client::<S>::parse_single_value(&answer)
+    /// Send lines
+    pub fn send_lines(&mut self, lines: &[&str]) -> ClientResult<&mut Client<S>> {
+        const END_OF_DATA: [&str; 1] = ["."];
+        write_lines(&mut self.output, lines)?;
+        send_lines(&mut self.output, &END_OF_DATA)?;
+        Ok(self)
+    }
+
+    /// Send a line
+    pub fn send_line(&mut self, line: &str) -> ClientResult<&mut Client<S>> {
+        const END_OF_DATA: &str = ".";
+        self.send_lines(&[line, END_OF_DATA])
+    }
+
+    /// Send a char
+    pub fn send_char(&mut self, ch: char) -> ClientResult<&mut Client<S>> {
+        self.send_lines(&[format!("CHAR {}", ch).as_str()])
     }
 
     /// Send a symbolic key name
-    pub fn say_key_name(&mut self, keyname: KeyName) -> ClientResult<MessageId> {
-        let line = format!("KEY {}", keyname);
-        let mut answer = Vec::new();
-        send_lines!(&mut self.input, &mut self.output, &[&line], &mut answer)?;
-        Client::<S>::parse_single_value(&answer)
+    pub fn say_key_name(&mut self, keyname: KeyName) -> ClientResult<&mut Client<S>> {
+        self.send_lines(&[format!("KEY {}", keyname).as_str()])
     }
 
     /// Action on a message or a group of messages
-    fn send_message_command(&mut self, command: &str, scope: MessageScope) -> ClientStatus {
+    fn send_message_command(
+        &mut self,
+        command: &str,
+        scope: MessageScope,
+    ) -> ClientResult<&mut Client<S>> {
         let line = match scope {
             MessageScope::Last => format!("{} self", command),
             MessageScope::All => format!("{} all", command),
             MessageScope::Message(id) => format!("{} {}", command, id),
         };
-        send_lines!(&mut self.input, &mut self.output, &[line.as_str()])
+        send_lines(&mut self.output, &[line.as_str()])?;
+        Ok(self)
     }
 
     /// Stop current message
-    pub fn stop(&mut self, scope: MessageScope) -> ClientStatus {
+    pub fn stop(&mut self, scope: MessageScope) -> ClientResult<&mut Client<S>> {
         self.send_message_command("STOP", scope)
     }
 
     /// Cancel current message
-    pub fn cancel(&mut self, scope: MessageScope) -> ClientStatus {
+    pub fn cancel(&mut self, scope: MessageScope) -> ClientResult<&mut Client<S>> {
         self.send_message_command("CANCEL", scope)
     }
 
     /// Pause current message
-    pub fn pause(&mut self, scope: MessageScope) -> ClientStatus {
+    pub fn pause(&mut self, scope: MessageScope) -> ClientResult<&mut Client<S>> {
         self.send_message_command("PAUSE", scope)
     }
 
     /// Resume current message
-    pub fn resume(&mut self, scope: MessageScope) -> ClientStatus {
+    pub fn resume(&mut self, scope: MessageScope) -> ClientResult<&mut Client<S>> {
         self.send_message_command("RESUME", scope)
     }
 
-    client_setter!(
+    client_send!(
         set_priority,
         "Set message priority",
         priority as Priority,
         "SET self PRIORITY {}"
     );
 
-    /// Set debug mode. Return the log location.
-    pub fn set_debug(&mut self, value: bool) -> ClientResult<String> {
-        let line = format!("SET all DEBUG {}", on_off(value));
-        let mut answer = Vec::new();
-        send_lines!(&mut self.input, &mut self.output, &[&line], &mut answer)?;
-        Client::<S>::parse_single_value(&answer)
-    }
+    client_send_boolean!(
+        set_debug,
+        "Set debug mode. Return the log location",
+        value,
+        "SET all DEBUG {}"
+    );
 
-    client_setter!(
+    client_send!(
         set_output_module,
         "Set output module",
         scope,
@@ -298,19 +296,19 @@ impl<S: Read + Write> Client<S> {
         "SET {} OUTPUT_MODULE {}"
     );
 
-    client_single_getter!(
+    client_send!(
         get_output_module,
         "Get the current output module",
         "GET OUTPUT_MODULE"
     );
 
-    client_getter!(
+    client_send!(
         list_output_modules,
         "List the available output modules",
         "LIST OUTPUT_MODULES"
     );
 
-    client_setter!(
+    client_send!(
         set_language,
         "Set language code",
         scope,
@@ -318,16 +316,16 @@ impl<S: Read + Write> Client<S> {
         "SET {} LANGUAGE {}"
     );
 
-    client_single_getter!(get_language, "Get the current language", "GET LANGUAGE");
+    client_send!(get_language, "Get the current language", "GET LANGUAGE");
 
-    client_boolean_setter!(
+    client_send_boolean!(
         set_ssml_mode,
         "Set SSML mode (Speech Synthesis Markup Language)",
         value,
         "SET self SSML_MODE {}"
     );
 
-    client_setter!(
+    client_send!(
         set_punctuation_mode,
         "Set punctuation mode",
         scope,
@@ -335,7 +333,7 @@ impl<S: Read + Write> Client<S> {
         "SET {} PUNCTUATION {}"
     );
 
-    client_boolean_setter!(
+    client_send_boolean!(
         set_spelling,
         "Set spelling on or off",
         scope,
@@ -343,7 +341,7 @@ impl<S: Read + Write> Client<S> {
         "SET {} SPELLING {}"
     );
 
-    client_setter!(
+    client_send!(
         set_capital_letter_recogn,
         "Set capital letters recognition mode",
         scope,
@@ -351,7 +349,7 @@ impl<S: Read + Write> Client<S> {
         "SET {} CAP_LET_RECOGN {}"
     );
 
-    client_setter!(
+    client_send!(
         set_voice_type,
         "Set the voice type (MALE1, FEMALE1, …)",
         scope,
@@ -359,19 +357,19 @@ impl<S: Read + Write> Client<S> {
         "SET {} VOICE_TYPE {}"
     );
 
-    client_single_getter!(
+    client_send!(
         get_voice_type,
         "Get the current pre-defined voice",
         "GET VOICE_TYPE"
     );
 
-    client_getter!(
+    client_send!(
         list_voice_types,
         "List the available symbolic voice names",
         "LIST VOICES"
     );
 
-    client_setter!(
+    client_send!(
         set_synthesis_voice,
         "Set the voice",
         scope,
@@ -379,24 +377,13 @@ impl<S: Read + Write> Client<S> {
         "SET {} SYNTHESIS_VOICE {}"
     );
 
-    /// Lists the available voices for the current synthesizer.
-    pub fn list_synthesis_voices(&mut self) -> ClientResult<Vec<SynthesisVoice>> {
-        let mut result = Vec::new();
-        send_lines!(
-            &mut self.input,
-            &mut self.output,
-            &["LIST SYNTHESIS_VOICES"],
-            &mut result
-        )?;
-        let mut voices = Vec::new();
-        for name in result.iter() {
-            let voice = SynthesisVoice::from_str(name.as_str())?;
-            voices.push(voice);
-        }
-        Ok(voices)
-    }
+    client_send!(
+        list_synthesis_voices,
+        "Lists the available voices for the current synthesizer",
+        "LIST SYNTHESIS_VOICES"
+    );
 
-    client_range_setter!(
+    client_send_range!(
         set_rate,
         "Set the rate of speech. n is an integer value within the range from -100 to 100, lower values meaning slower speech.",
         scope,
@@ -404,9 +391,9 @@ impl<S: Read + Write> Client<S> {
         "SET {} RATE {}"
     );
 
-    client_single_getter!(get_rate, "Get the current rate of speech.", u8, "GET RATE");
+    client_send!(get_rate, "Get the current rate of speech.", "GET RATE");
 
-    client_range_setter!(
+    client_send_range!(
         set_pitch,
         "Set the pitch of speech. n is an integer value within the range from -100 to 100.",
         scope,
@@ -414,9 +401,9 @@ impl<S: Read + Write> Client<S> {
         "SET {} PITCH {}"
     );
 
-    client_single_getter!(get_pitch, "Get the current pitch value.", u8, "GET PITCH");
+    client_send!(get_pitch, "Get the current pitch value.", "GET PITCH");
 
-    client_range_setter!(
+    client_send_range!(
         set_volume,
         "Set the volume of speech. n is an integer value within the range from -100 to 100.",
         scope,
@@ -424,7 +411,7 @@ impl<S: Read + Write> Client<S> {
         "SET {} VOLUME {}"
     );
 
-    client_setter!(
+    client_send!(
         set_pause_context,
         "Set the number of (more or less) sentences that should be repeated after a previously paused text is resumed.",
         scope,
@@ -432,7 +419,7 @@ impl<S: Read + Write> Client<S> {
         "SET {} PAUSE_CONTEXT {}"
     );
 
-    client_boolean_setter!(
+    client_send_boolean!(
         set_history,
         "Enable or disable history of received messages.",
         scope,
@@ -440,27 +427,84 @@ impl<S: Read + Write> Client<S> {
         "SET {} HISTORY {}"
     );
 
-    client_single_getter!(get_volume, "Get the current volume.", u8, "GET VOLUME");
+    client_send!(get_volume, "Get the current volume.", "GET VOLUME");
 
-    client_setter!(block_begin, "Open a block", "BLOCK BEGIN");
+    client_send!(block_begin, "Open a block", "BLOCK BEGIN");
 
-    client_setter!(block_end, "End a block", "BLOCK END");
+    client_send!(block_end, "End a block", "BLOCK END");
 
-    client_setter!(quit, "Close the connection", "QUIT");
+    client_send!(quit, "Close the connection", "QUIT");
 
-    client_setter!(
+    client_send!(
         enable_notification,
         "Enable notification events",
         value as NotificationType,
         "SET self NOTIFICATION {} on"
     );
 
-    client_setter!(
+    client_send!(
         disable_notification,
         "Disable notification events",
         value as NotificationType,
         "SET self NOTIFICATION {} off"
     );
+
+    /// Receive answer from server
+    pub fn receive(&mut self, lines: &mut Vec<String>) -> ClientStatus {
+        crate::protocol::receive_answer(&mut self.input, Some(lines))
+    }
+
+    /// Check status of answer, discard lines.
+    pub fn check_status(&mut self, expected_code: ReturnCode) -> ClientResult<&mut Client<S>> {
+        crate::protocol::receive_answer(&mut self.input, None).and_then(|status| {
+            if status.code == expected_code {
+                Ok(self)
+            } else {
+                Err(ClientError::UnexpectedStatus(status.code))
+            }
+        })
+    }
+
+    /// Receive lines
+    pub fn receive_lines(&mut self, expected_code: ReturnCode) -> ClientResult<Vec<String>> {
+        let mut lines = Vec::new();
+        let status = self.receive(&mut lines)?;
+        if status.code == expected_code {
+            Ok(lines)
+        } else {
+            Err(ClientError::UnexpectedStatus(status.code))
+        }
+    }
+
+    /// Receive a single string
+    pub fn receive_string(&mut self, expected_code: ReturnCode) -> ClientResult<String> {
+        self.receive_lines(expected_code)
+            .and_then(|lines| Client::<S>::parse_single_value(&lines))
+    }
+
+    /// Receive integer
+    pub fn receive_u8(&mut self, expected_code: ReturnCode) -> ClientResult<u8> {
+        self.receive_string(expected_code)
+            .and_then(|s| s.parse().map_err(|_| ClientError::InvalidType))
+    }
+
+    /// Receive message id
+    pub fn receive_message_id(&mut self) -> ClientResult<MessageId> {
+        self.receive_string(OK_MESSAGE_QUEUED)
+            .and_then(|s| s.parse().map_err(|_| ClientError::InvalidType))
+    }
+
+    /// Receive a list of synthesis voices
+    pub fn receive_synthesis_voices(&mut self) -> ClientResult<Vec<SynthesisVoice>> {
+        self.receive_lines(OK_VOICES_LIST_SENT).and_then(|lines| {
+            let mut voices = Vec::new();
+            for name in lines.iter() {
+                let voice = SynthesisVoice::from_str(name.as_str())?;
+                voices.push(voice);
+            }
+            Ok(voices)
+        })
+    }
 
     /// Receive a notification
     pub fn receive_event(&mut self) -> ClientResult<Event> {
@@ -490,12 +534,26 @@ impl<S: Read + Write> Client<S> {
             }
         })
     }
+
+    #[cfg(feature = "metal-io")]
+    pub fn register(&mut self, poll: &mio::Poll, token: mio::Token) -> ClientResult<()> {
+        poll.registry().register(
+            &mut self.socket,
+            token,
+            mio::Interest::READABLE | mio::Interest::WRITABLE,
+        )?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
+    #[cfg(not(feature = "metal-io"))]
     use std::net::TcpStream;
+
+    #[cfg(feature = "metal-io")]
+    use mio::net::TcpStream;
 
     use super::{Client, ClientError};
 

@@ -1,6 +1,6 @@
 [package]
 name = "ssip-client"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Laurent Pelecq <lpelecq+rust@circoise.eu>"]
 edition = "2018"
 description = "Client API for Speech Dispatcher"
@@ -11,9 +11,17 @@ repository = "https://gitlab.com/lp-accessibility/ssip-client"
 
 [dependencies]
 dirs = "4"
+mio = { version = "0", optional = true }
 thiserror = "1"
 strum = "0.24"
 strum_macros = "0.24"
 
 [dev-dependencies]
 libc = "0"
+
+[features]
+metal-io = ["mio/net", "mio/os-poll"]
+
+[[example]]
+name = "async-mio"
+required-features = ["metal-io"]

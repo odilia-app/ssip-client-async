@@ -1,10 +1,12 @@
-use ssip_client::{ClientName, ClientResult, EventType, NotificationType};
+use ssip_client::{ClientName, ClientResult, EventType, NotificationType, OK_CLIENT_NAME_SET};
 
 fn main() -> ClientResult<()> {
-    let mut client =
-        ssip_client::new_default_fifo_client(&ClientName::new("joe", "notifications"), None)?;
+    let mut client = ssip_client::new_default_fifo_client(None)?;
+    client
+        .open(ClientName::new("joe", "notifications"))?
+        .check_status(OK_CLIENT_NAME_SET)?;
     client.enable_notification(NotificationType::All).unwrap();
-    let msg_id = client.say_line("hello")?;
+    let msg_id = client.speak()?.send_line("hello")?.receive_message_id()?;
     println!("message: {}", msg_id);
     loop {
         match client.receive_event() {

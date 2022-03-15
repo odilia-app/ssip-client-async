@@ -21,26 +21,6 @@ macro_rules! invalid_input {
     };
 }
 
-macro_rules! send_lines {
-    ($input:expr, $output:expr, $lines:expr) => {
-        crate::protocol::send_lines($output, $lines)
-            .and_then(|()| crate::protocol::receive_answer($input, None))
-    };
-    ($input:expr, $output:expr, $lines:expr, $out:expr) => {
-        crate::protocol::send_lines($output, $lines)
-            .and_then(|()| crate::protocol::receive_answer($input, Some($out)))
-    };
-}
-
-macro_rules! send_line {
-    ($input:expr, $output:expr, $line:expr) => {
-        send_lines!($input, $output, &[$line])
-    };
-    ($input:expr, $output:expr, $fmt:expr, $($arg:tt)*) => {
-        send_line!($input, $output, format!($fmt, $($arg)*).as_str())
-    };
-}
-
 pub(crate) fn write_lines(output: &mut dyn Write, lines: &[&str]) -> ClientResult<()> {
     for line in lines.iter() {
         output.write_all(line.as_bytes())?;
