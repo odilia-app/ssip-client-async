@@ -25,13 +25,13 @@ To use the synchronous API, use:
 
 ```toml
 [dependencies]
-ssip-client = "0.3"
+ssip-client = "0.4"
 ```
 
 For the asynchronous API, use:
 ```toml
 [dependencies]
-ssip-client = { version = "0.3", features = ["async-mio"] }
+ssip-client = { version = "0.4", features = ["async-mio"] }
 ```
 
 Example
