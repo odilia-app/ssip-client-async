@@ -7,13 +7,14 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
+use mio::event::Source;
 use std::collections::VecDeque;
 use std::io::{self, Read, Write};
 
 use crate::{
     client::{Client, ClientError, ClientName, ClientResult},
     constants::*,
-    types::{EventId, Source, SynthesisVoice},
+    types::{EventId, SynthesisVoice},
 };
 
 #[derive(Debug)]

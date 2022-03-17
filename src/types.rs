@@ -378,13 +378,6 @@ impl fmt::Display for StatusLine {
     }
 }
 
-#[cfg(not(feature = "async-mio"))]
-// Trick to have common implementation for std and mio streams..
-pub use std::fmt::Debug as Source;
-
-#[cfg(feature = "async-mio")]
-pub use mio::event::Source;
-
 #[cfg(test)]
 mod tests {
 

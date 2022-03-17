@@ -15,8 +15,15 @@ use crate::constants::*;
 use crate::protocol::{send_lines, write_lines};
 use crate::types::{
     CapitalLettersRecognitionMode, ClientScope, Event, KeyName, MessageId, MessageScope,
-    NotificationType, Priority, PunctuationMode, ReturnCode, Source, StatusLine, SynthesisVoice,
+    NotificationType, Priority, PunctuationMode, ReturnCode, StatusLine, SynthesisVoice,
 };
+
+// Trick to have common implementation for std and mio streams..
+#[cfg(not(feature = "async-mio"))]
+use std::fmt::Debug as Source;
+
+#[cfg(feature = "async-mio")]
+use mio::event::Source;
 
 /// Client error, either I/O error or SSIP error.
 #[derive(ThisError, Debug)]
