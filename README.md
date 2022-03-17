@@ -39,7 +39,7 @@ Example
 
 ```rust
 use ssip_client::{FifoBuilder, ClientName};
-let mut client = FifoBuilder::new().build()?;
+let mut client = fifo::Builder::new().build()?;
 client
     .set_client_name(ClientName::new("joe", "hello"))?
     .check_client_name_set()?;
