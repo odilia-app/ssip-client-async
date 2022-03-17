@@ -393,8 +393,7 @@ fn receive_notification() -> io::Result<()> {
             match client.receive_event() {
                 Ok(Event {
                     ntype: EventType::Begin,
-                    message: _,
-                    client: _,
+                    ..
                 }) => Ok(()),
                 Ok(_) => panic!("wrong event"),
                 Err(_) => panic!("error on event"),

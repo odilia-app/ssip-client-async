@@ -259,44 +259,61 @@ pub enum EventType {
     IndexMark(String),
 }
 
+/// Event identifier
+#[derive(Debug)]
+pub struct EventId {
+    // Message id
+    pub message: String,
+    // Client id
+    pub client: String,
+}
+
+impl EventId {
+    // New event identifier
+    pub fn new(message: &str, client: &str) -> Self {
+        Self {
+            message: message.to_string(),
+            client: client.to_string(),
+        }
+    }
+}
+
 /// Notification event
 #[derive(Debug)]
 pub struct Event {
     pub ntype: EventType,
-    pub message: String,
-    pub client: String,
+    pub id: EventId,
 }
 
 impl Event {
-    pub fn new(ntype: EventType, message: String, client: String) -> Event {
+    pub fn new(ntype: EventType, message: &str, client: &str) -> Event {
         Event {
             ntype,
-            message,
-            client,
+            id: EventId::new(message, client),
         }
     }
 
-    pub fn begin(message: String, client: String) -> Event {
+    pub fn begin(message: &str, client: &str) -> Event {
         Event::new(EventType::Begin, message, client)
     }
 
-    pub fn end(message: String, client: String) -> Event {
+    pub fn end(message: &str, client: &str) -> Event {
         Event::new(EventType::End, message, client)
     }
 
-    pub fn index_mark(mark: String, message: String, client: String) -> Event {
+    pub fn index_mark(mark: String, message: &str, client: &str) -> Event {
         Event::new(EventType::IndexMark(mark), message, client)
     }
 
-    pub fn cancel(message: String, client: String) -> Event {
+    pub fn cancel(message: &str, client: &str) -> Event {
         Event::new(EventType::Cancel, message, client)
     }
 
-    pub fn pause(message: String, client: String) -> Event {
+    pub fn pause(message: &str, client: &str) -> Event {
         Event::new(EventType::Pause, message, client)
     }
 
-    pub fn resume(message: String, client: String) -> Event {
+    pub fn resume(message: &str, client: &str) -> Event {
         Event::new(EventType::Resume, message, client)
     }
 }

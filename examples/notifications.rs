@@ -26,7 +26,7 @@ fn main() -> ClientResult<()> {
             Ok(event) => {
                 println!(
                     "event {}: message {} client {}",
-                    event.ntype, event.message, event.client
+                    event.ntype, event.id.message, event.id.client
                 );
                 if matches!(event.ntype, EventType::End) {
                     break;

@@ -1,5 +1,5 @@
 // ssip-client -- Speech Dispatcher client in Rust
-// Copyright (c) 2021 Laurent Pelecq
+// Copyright (c) 2021-2022 Laurent Pelecq
 //
 // Licensed under the Apache License, Version 2.0
 // <LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
@@ -176,7 +176,7 @@ impl<S: Read + Write + Source> Client<S> {
     }
 
     /// Return the only string in the list or an error if there is no line or too many.
-    fn parse_single_value(lines: &[String]) -> ClientResult<String> {
+    pub(crate) fn parse_single_value(lines: &[String]) -> ClientResult<String> {
         match lines.len() {
             0 => Err(ClientError::TooFewLines),
             1 => Ok(lines[0].to_string()),
@@ -184,8 +184,17 @@ impl<S: Read + Write + Source> Client<S> {
         }
     }
 
+    pub(crate) fn parse_synthesis_voices(lines: &[String]) -> ClientResult<Vec<SynthesisVoice>> {
+        let mut voices = Vec::new();
+        for name in lines.iter() {
+            let voice = SynthesisVoice::from_str(name.as_str())?;
+            voices.push(voice);
+        }
+        Ok(voices)
+    }
+
     /// Set the client name. It must be the first call on startup.
-    pub fn set_client_name(&mut self, client_name: ClientName) -> ClientResult<&mut Client<S>> {
+    pub fn set_client_name(&mut self, client_name: ClientName) -> ClientResult<&mut Self> {
         send_lines(
             &mut self.output,
             &[format!(
@@ -198,13 +207,13 @@ impl<S: Read + Write + Source> Client<S> {
     }
 
     /// Initiate communitation to send text to speak
-    pub fn speak(&mut self) -> ClientResult<&mut Client<S>> {
+    pub fn speak(&mut self) -> ClientResult<&mut Self> {
         send_lines(&mut self.output, &["SPEAK"])?;
         Ok(self)
     }
 
     /// Send lines
-    pub fn send_lines(&mut self, lines: &[&str]) -> ClientResult<&mut Client<S>> {
+    pub fn send_lines(&mut self, lines: &[&str]) -> ClientResult<&mut Self> {
         const END_OF_DATA: [&str; 1] = ["."];
         write_lines(&mut self.output, lines)?;
         send_lines(&mut self.output, &END_OF_DATA)?;
@@ -212,20 +221,20 @@ impl<S: Read + Write + Source> Client<S> {
     }
 
     /// Send a line
-    pub fn send_line(&mut self, line: &str) -> ClientResult<&mut Client<S>> {
+    pub fn send_line(&mut self, line: &str) -> ClientResult<&mut Self> {
         const END_OF_DATA: &str = ".";
         send_lines(&mut self.output, &[line, END_OF_DATA])?;
         Ok(self)
     }
 
     /// Send a char
-    pub fn send_char(&mut self, ch: char) -> ClientResult<&mut Client<S>> {
+    pub fn send_char(&mut self, ch: char) -> ClientResult<&mut Self> {
         send_lines(&mut self.output, &[format!("CHAR {}", ch).as_str()])?;
         Ok(self)
     }
 
     /// Send a symbolic key name
-    pub fn say_key_name(&mut self, keyname: KeyName) -> ClientResult<&mut Client<S>> {
+    pub fn say_key_name(&mut self, keyname: KeyName) -> ClientResult<&mut Self> {
         self.send_lines(&[format!("KEY {}", keyname).as_str()])
     }
 
@@ -234,7 +243,7 @@ impl<S: Read + Write + Source> Client<S> {
         &mut self,
         command: &str,
         scope: MessageScope,
-    ) -> ClientResult<&mut Client<S>> {
+    ) -> ClientResult<&mut Self> {
         let line = match scope {
             MessageScope::Last => format!("{} self", command),
             MessageScope::All => format!("{} all", command),
@@ -245,22 +254,22 @@ impl<S: Read + Write + Source> Client<S> {
     }
 
     /// Stop current message
-    pub fn stop(&mut self, scope: MessageScope) -> ClientResult<&mut Client<S>> {
+    pub fn stop(&mut self, scope: MessageScope) -> ClientResult<&mut Self> {
         self.send_message_command("STOP", scope)
     }
 
     /// Cancel current message
-    pub fn cancel(&mut self, scope: MessageScope) -> ClientResult<&mut Client<S>> {
+    pub fn cancel(&mut self, scope: MessageScope) -> ClientResult<&mut Self> {
         self.send_message_command("CANCEL", scope)
     }
 
     /// Pause current message
-    pub fn pause(&mut self, scope: MessageScope) -> ClientResult<&mut Client<S>> {
+    pub fn pause(&mut self, scope: MessageScope) -> ClientResult<&mut Self> {
         self.send_message_command("PAUSE", scope)
     }
 
     /// Resume current message
-    pub fn resume(&mut self, scope: MessageScope) -> ClientResult<&mut Client<S>> {
+    pub fn resume(&mut self, scope: MessageScope) -> ClientResult<&mut Self> {
         self.send_message_command("RESUME", scope)
     }
 
@@ -445,7 +454,7 @@ impl<S: Read + Write + Source> Client<S> {
     }
 
     /// Check status of answer, discard lines.
-    pub fn check_status(&mut self, expected_code: ReturnCode) -> ClientResult<&mut Client<S>> {
+    pub fn check_status(&mut self, expected_code: ReturnCode) -> ClientResult<&mut Self> {
         crate::protocol::receive_answer(&mut self.input, None).and_then(|status| {
             if status.code == expected_code {
                 Ok(self)
@@ -469,7 +478,7 @@ impl<S: Read + Write + Source> Client<S> {
     /// Receive a single string
     pub fn receive_string(&mut self, expected_code: ReturnCode) -> ClientResult<String> {
         self.receive_lines(expected_code)
-            .and_then(|lines| Client::<S>::parse_single_value(&lines))
+            .and_then(|lines| Self::parse_single_value(&lines))
     }
 
     /// Receive integer
@@ -486,14 +495,8 @@ impl<S: Read + Write + Source> Client<S> {
 
     /// Receive a list of synthesis voices
     pub fn receive_synthesis_voices(&mut self) -> ClientResult<Vec<SynthesisVoice>> {
-        self.receive_lines(OK_VOICES_LIST_SENT).and_then(|lines| {
-            let mut voices = Vec::new();
-            for name in lines.iter() {
-                let voice = SynthesisVoice::from_str(name.as_str())?;
-                voices.push(voice);
-            }
-            Ok(voices)
-        })
+        self.receive_lines(OK_VOICES_LIST_SENT)
+            .and_then(|lines| Self::parse_synthesis_voices(&lines))
     }
 
     /// Receive a notification
@@ -503,8 +506,8 @@ impl<S: Read + Write + Source> Client<S> {
             if lines.len() < 2 {
                 Err(ClientError::TruncatedMessage)
             } else {
-                let message = lines[0].to_owned();
-                let client = lines[1].to_owned();
+                let message = &lines[0];
+                let client = &lines[1];
                 match status.code {
                     700 => {
                         if lines.len() != 3 {
@@ -526,12 +529,12 @@ impl<S: Read + Write + Source> Client<S> {
     }
 
     /// Check the result of `set_client_name`.
-    pub fn check_client_name_set(&mut self) -> ClientResult<&mut Client<S>> {
+    pub fn check_client_name_set(&mut self) -> ClientResult<&mut Self> {
         self.check_status(OK_CLIENT_NAME_SET)
     }
 
     /// Check if server accept data.
-    pub fn check_receiving_data(&mut self) -> ClientResult<&mut Client<S>> {
+    pub fn check_receiving_data(&mut self) -> ClientResult<&mut Self> {
         self.check_status(OK_RECEIVING_DATA)
     }
 
