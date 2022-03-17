@@ -25,12 +25,12 @@ pub enum ClientError {
     InvalidType,
     #[error("I/O: {0}")]
     Io(io::Error),
-    #[error("No line in result")]
-    NoLine,
     #[error("Not ready")]
     NotReady,
     #[error("SSIP: {0}")]
     Ssip(StatusLine),
+    #[error("Too few lines")]
+    TooFewLines,
     #[error("Too many lines")]
     TooManyLines,
     #[error("Truncated message")]
@@ -56,6 +56,7 @@ pub type ClientResult<T> = Result<T, ClientError>;
 pub type ClientStatus = ClientResult<StatusLine>;
 
 /// Client name
+#[derive(Debug)]
 pub struct ClientName {
     pub user: String,
     pub application: String,
@@ -177,7 +178,7 @@ impl<S: Read + Write + Source> Client<S> {
     /// Return the only string in the list or an error if there is no line or too many.
     fn parse_single_value(lines: &[String]) -> ClientResult<String> {
         match lines.len() {
-            0 => Err(ClientError::NoLine),
+            0 => Err(ClientError::TooFewLines),
             1 => Ok(lines[0].to_string()),
             _ => Err(ClientError::TooManyLines),
         }
@@ -219,7 +220,8 @@ impl<S: Read + Write + Source> Client<S> {
 
     /// Send a char
     pub fn send_char(&mut self, ch: char) -> ClientResult<&mut Client<S>> {
-        self.send_lines(&[format!("CHAR {}", ch).as_str()])
+        send_lines(&mut self.output, &[format!("CHAR {}", ch).as_str()])?;
+        Ok(self)
     }
 
     /// Send a symbolic key name
@@ -540,7 +542,7 @@ impl<S: Read + Write + Source> Client<S> {
         poll: &mio::Poll,
         input_token: mio::Token,
         output_token: mio::Token,
-    ) -> ClientResult<()> {
+    ) -> io::Result<()> {
         poll.registry()
             .register(self.input.get_mut(), input_token, mio::Interest::READABLE)?;
         poll.registry()
@@ -565,7 +567,7 @@ mod tests {
         let result = Client::<TcpStream>::parse_single_value(&[String::from("one")]).unwrap();
         assert_eq!("one", result);
         let err_empty = Client::<TcpStream>::parse_single_value(&[]);
-        assert!(matches!(err_empty, Err(ClientError::NoLine)));
+        assert!(matches!(err_empty, Err(ClientError::TooFewLines)));
         let err_too_many =
             Client::<TcpStream>::parse_single_value(&[String::from("one"), String::from("two")]);
         assert!(matches!(err_too_many, Err(ClientError::TooManyLines)));
