@@ -1,4 +1,4 @@
-use ssip_client::{ClientName, ClientResult, FifoBuilder};
+use ssip_client::{fifo, ClientName, ClientResult};
 
 // ==============================
 //   Synchronous implementation
@@ -6,7 +6,7 @@ use ssip_client::{ClientName, ClientResult, FifoBuilder};
 
 #[cfg(not(feature = "async-mio"))]
 fn main() -> ClientResult<()> {
-    let mut client = FifoBuilder::new().build()?;
+    let mut client = fifo::Builder::new().build()?;
     client
         .set_client_name(ClientName::new("joe", "hello"))?
         .check_client_name_set()?;
@@ -125,7 +125,7 @@ fn main() -> ClientResult<()> {
     // Create the poll object, the client and register the socket.
     let mut poll = Poll::new()?;
     let mut events = Events::with_capacity(16);
-    let mut client = FifoBuilder::new().build()?;
+    let mut client = fifo::Builder::new().build()?;
     let input_token = Token(0);
     let output_token = Token(1);
     client.register(&poll, input_token, output_token)?;

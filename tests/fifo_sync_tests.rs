@@ -34,7 +34,7 @@ where
     let mut process_wrapper = std::panic::AssertUnwindSafe(process);
     let result = std::panic::catch_unwind(move || {
         let handle = Server::run(&server_path, communication);
-        let mut client = ssip_client::FifoBuilder::new()
+        let mut client = ssip_client::fifo::Builder::new()
             .path(&server_path)
             .build()
             .unwrap();

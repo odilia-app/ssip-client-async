@@ -1,11 +1,11 @@
 #[cfg(not(feature = "async-mio"))]
 use ssip_client::{
-    ClientName, ClientResult, EventType, FifoBuilder, NotificationType, OK_NOTIFICATION_SET,
+    fifo, ClientName, ClientResult, EventType, NotificationType, OK_NOTIFICATION_SET,
 };
 
 #[cfg(not(feature = "async-mio"))]
 fn main() -> ClientResult<()> {
-    let mut client = FifoBuilder::new().build()?;
+    let mut client = fifo::Builder::new().build()?;
     client
         .set_client_name(ClientName::new("joe", "notifications"))?
         .check_client_name_set()?;

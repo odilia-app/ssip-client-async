@@ -1,6 +1,6 @@
 #[cfg(not(feature = "async-mio"))]
 use ssip_client::{
-    ClientName, ClientResult, FifoBuilder, SynthesisVoice, OK_OUTPUT_MODULES_LIST_SENT,
+    fifo, ClientName, ClientResult, SynthesisVoice, OK_OUTPUT_MODULES_LIST_SENT,
     OK_VOICES_LIST_SENT,
 };
 
@@ -23,7 +23,7 @@ fn main() -> ClientResult<()> {
         }
     }
 
-    let mut client = FifoBuilder::new().build()?;
+    let mut client = fifo::Builder::new().build()?;
     client
         .set_client_name(ClientName::new("joe", "list"))?
         .check_client_name_set()?;

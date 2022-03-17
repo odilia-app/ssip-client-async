@@ -61,20 +61,20 @@ mod synchronous {
 
     use super::FifoPath;
 
-    pub struct FifoBuilder {
+    pub struct Builder {
         path: FifoPath,
         read_timeout: Option<Duration>,
     }
 
-    impl FifoBuilder {
-        pub fn new() -> FifoBuilder {
-            FifoBuilder {
+    impl Builder {
+        pub fn new() -> Self {
+            Self {
                 path: FifoPath::new(),
                 read_timeout: None,
             }
         }
 
-        pub fn path<P>(&mut self, socket_path: P) -> &mut FifoBuilder
+        pub fn path<P>(&mut self, socket_path: P) -> &mut Self
         where
             P: AsRef<Path>,
         {
@@ -82,7 +82,7 @@ mod synchronous {
             self
         }
 
-        pub fn timeout(&mut self, read_timeout: Duration) -> &mut FifoBuilder {
+        pub fn timeout(&mut self, read_timeout: Duration) -> &mut Self {
             self.read_timeout = Some(read_timeout);
             self
         }
@@ -97,7 +97,7 @@ mod synchronous {
 }
 
 #[cfg(not(feature = "async-mio"))]
-pub use synchronous::{FifoBuilder, UnixStream};
+pub use synchronous::{Builder, UnixStream};
 
 #[cfg(feature = "async-mio")]
 mod asynchronous {
@@ -110,13 +110,13 @@ mod asynchronous {
 
     use super::FifoPath;
 
-    pub struct FifoBuilder {
+    pub struct Builder {
         path: FifoPath,
     }
 
-    impl FifoBuilder {
+    impl Builder {
         pub fn new() -> Self {
-            FifoBuilder {
+            Self {
                 path: FifoPath::new(),
             }
         }
@@ -126,7 +126,7 @@ mod asynchronous {
             Ok(socket)
         }
 
-        pub fn path<P>(&mut self, socket_path: P) -> &mut FifoBuilder
+        pub fn path<P>(&mut self, socket_path: P) -> &mut Self
         where
             P: AsRef<Path>,
         {
@@ -137,19 +137,19 @@ mod asynchronous {
         pub fn build(&self) -> io::Result<Client<UnixStream>> {
             let stream = StdUnixStream::connect(self.path.get()?)?;
             Ok(Client::new(
-                BufReader::new(UnixStream::from_std(FifoBuilder::non_blocking(
+                BufReader::new(UnixStream::from_std(Self::non_blocking(
                     stream.try_clone()?,
                 )?)),
-                BufWriter::new(UnixStream::from_std(FifoBuilder::non_blocking(stream)?)),
+                BufWriter::new(UnixStream::from_std(Self::non_blocking(stream)?)),
             ))
         }
     }
 }
 
 #[cfg(feature = "async-mio")]
-pub use asynchronous::{FifoBuilder, UnixStream};
+pub use asynchronous::{Builder, UnixStream};
 
-impl Default for FifoBuilder {
+impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }

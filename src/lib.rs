@@ -16,8 +16,8 @@
 //!
 //! Example
 //! ```no_run
-//! use ssip_client::{FifoBuilder, ClientName};
-//! let mut client = FifoBuilder::new().build()?;
+//! use ssip_client::{fifo, ClientName};
+//! let mut client = fifo::Builder::new().build()?;
 //! client
 //!     .set_client_name(ClientName::new("joe", "hello"))?
 //!     .check_client_name_set()?;
@@ -30,12 +30,12 @@
 mod protocol;
 
 mod client;
-mod constants;
-mod fifo;
 mod types;
+
+pub mod constants;
+pub mod fifo;
 
 pub use client::{Client, ClientError, ClientName, ClientResult, ClientStatus};
 pub use constants::*;
-pub use fifo::FifoBuilder;
 pub use types::StatusLine;
 pub use types::*;

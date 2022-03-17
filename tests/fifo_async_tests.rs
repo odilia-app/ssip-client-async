@@ -76,7 +76,7 @@ fn basic_async_communication() -> std::io::Result<()> {
         let handle = Server::run(&server_path, &COMMUNICATION);
         let mut poll = Poll::new()?;
         let mut events = Events::with_capacity(128);
-        let mut client = FifoBuilder::new().path(&server_path).build().unwrap();
+        let mut client = fifo::Builder::new().path(&server_path).build().unwrap();
         let input_token = Token(0);
         let output_token = Token(1);
         client.register(&poll, input_token, output_token).unwrap();
