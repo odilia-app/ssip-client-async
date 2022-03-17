@@ -11,6 +11,7 @@ repository = "https://gitlab.com/lp-accessibility/ssip-client"
 
 [dependencies]
 dirs = "4"
+log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
 mio = { version = "0.8", optional = true }
 thiserror = "1"
 strum = "0.24"

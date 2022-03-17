@@ -7,6 +7,7 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
+use log::debug;
 use std::io::{self, BufRead, Write};
 
 use crate::client::{ClientError, ClientResult, ClientStatus};
@@ -24,7 +25,7 @@ macro_rules! invalid_input {
 /// Write lines separated by CRLF.
 pub(crate) fn write_lines(output: &mut dyn Write, lines: &[&str]) -> ClientResult<()> {
     for line in lines.iter() {
-        // Uncomment to debug: dbg!(line.to_owned());
+        debug!("SSIP(out): {}", line);
         output.write_all(line.as_bytes())?;
         output.write_all(b"\r\n")?;
     }
@@ -64,7 +65,7 @@ pub(crate) fn receive_answer(
     loop {
         let mut line = String::new();
         input.read_line(&mut line).map_err(ClientError::Io)?;
-        // Uncomment to debug: dbg!(line.to_owned());
+        debug!("SSIP(in): {}", line.trim_end());
         match line.chars().nth(3) {
             Some(ch) => match ch {
                 ' ' => match line[0..3].parse::<u16>() {
