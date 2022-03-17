@@ -287,3 +287,21 @@ pub const ERR_PARAMETER_NOT_ON_OFF: ReturnCode = 513;
 
 /// Client error: ERR PARAMETER INVALID
 pub const ERR_PARAMETER_INVALID: ReturnCode = 514;
+
+/// Event: INDEX MARK
+pub const EVENT_INDEX_MARK: ReturnCode = 700;
+
+/// Event: BEGIN
+pub const EVENT_BEGIN: ReturnCode = 701;
+
+/// Event: END
+pub const EVENT_END: ReturnCode = 702;
+
+/// Event: CANCELED
+pub const EVENT_CANCELED: ReturnCode = 703;
+
+/// Event: PAUSED
+pub const EVENT_PAUSED: ReturnCode = 704;
+
+/// Event: RESUMED
+pub const EVENT_RESUMED: ReturnCode = 705;
