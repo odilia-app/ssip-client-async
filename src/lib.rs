@@ -12,7 +12,7 @@
 //! `ssip-client` implements a Speech Dispatcher SSIP client library in
 //! pure rust.
 //!
-//! See [`Client`] API for details.
+//! See [`client::Client`] for the synchronous API and [`async_mio::AsyncClient`] for the asynchronous API based on [mio](https://crates.io/crates/mio).
 //!
 //! Example
 //! ```no_run
@@ -29,13 +29,13 @@
 #[macro_use]
 mod protocol;
 
-mod client;
 mod types;
 
+pub mod client;
 pub mod constants;
 pub mod fifo;
 
-#[cfg(not(feature = "async-mio"))]
+#[cfg(any(not(feature = "async-mio"), doc))]
 pub use client::Client;
 
 pub use client::{ClientError, ClientName, ClientResult, ClientStatus};
@@ -43,7 +43,7 @@ pub use constants::*;
 pub use types::StatusLine;
 pub use types::*;
 
-#[cfg(feature = "async-mio")]
+#[cfg(any(feature = "async-mio", doc))]
 mod async_mio;
 
 #[cfg(feature = "async-mio")]
