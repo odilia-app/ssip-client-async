@@ -176,7 +176,7 @@ mod tests {
         let one_line = vec![one.to_owned()];
         assert_eq!(one, super::parse_single_value(&one_line)?);
 
-        let two_lines = vec![one.to_owned(), String::from("two")];
+        let two_lines = vec![one, String::from("two")];
         assert!(matches!(
             super::parse_single_value(&two_lines),
             Err(ClientError::TooManyLines)
