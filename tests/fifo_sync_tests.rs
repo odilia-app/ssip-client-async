@@ -24,30 +24,25 @@ use server::Server;
 fn test_client<F>(
     communication: &'static [(&'static str, &'static str)],
     process: F,
-) -> io::Result<()>
+) -> ClientResult<()>
 where
     F: FnMut(&mut Client<UnixStream>) -> io::Result<()>,
 {
-    let socket_path = Server::temporary_path();
+    let socket_dir = tempfile::tempdir()?;
+    let socket_path = socket_dir.path().join("test_client.socket");
     assert!(!socket_path.exists());
     let server_path = socket_path.clone();
     let mut process_wrapper = std::panic::AssertUnwindSafe(process);
-    let result = std::panic::catch_unwind(move || {
-        let handle = Server::run(&server_path, communication);
-        let mut client = ssip_client::fifo::Builder::new()
-            .path(&server_path)
-            .build()
-            .unwrap();
-        client
-            .set_client_name(ClientName::new("test", "test"))
-            .unwrap()
-            .check_client_name_set()
-            .unwrap();
-        process_wrapper(&mut client).unwrap();
-        handle.join().unwrap()
-    });
-    std::fs::remove_file(socket_path)?;
-    result.unwrap().unwrap();
+    let handle = Server::run(&server_path, communication);
+    let mut client = ssip_client::fifo::Builder::new()
+        .path(&server_path)
+        .build()?;
+    client
+        .set_client_name(ClientName::new("test", "test"))?
+        .check_client_name_set()?;
+    process_wrapper(&mut client)?;
+    handle.join().unwrap().unwrap();
+    socket_dir.close()?;
     Ok(())
 }
 
@@ -59,7 +54,7 @@ const SET_CLIENT_COMMUNICATION: (&str, &str) = (
 
 #[test]
 #[cfg(not(feature = "async-mio"))]
-fn connect_and_quit() -> io::Result<()> {
+fn connect_and_quit() -> ClientResult<()> {
     test_client(
         &[
             SET_CLIENT_COMMUNICATION,
@@ -74,7 +69,7 @@ fn connect_and_quit() -> io::Result<()> {
 
 #[test]
 #[cfg(not(feature = "async-mio"))]
-fn say_one_line() -> io::Result<()> {
+fn say_one_line() -> ClientResult<()> {
     test_client(
         &[
             SET_CLIENT_COMMUNICATION,
@@ -106,7 +101,7 @@ macro_rules! test_setter {
     ($setter:ident, $question:expr, $answer:expr, $code:expr, $($arg:tt)*) => {
         #[test]
         #[cfg(not(feature = "async-mio"))]
-        fn $setter() -> io::Result<()> {
+        fn $setter() -> ClientResult<()> {
             test_client(
                 &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
                 |client| {
@@ -122,7 +117,7 @@ macro_rules! test_getter {
     ($getter:ident, $receive:ident, $arg:tt, $question:expr, $answer:expr, $value:expr) => {
         #[test]
         #[cfg(not(feature = "async-mio"))]
-        fn $getter() -> io::Result<()> {
+        fn $getter() -> ClientResult<()> {
             test_client(
                 &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
                 |client| {
@@ -142,7 +137,7 @@ macro_rules! test_list {
     ($getter:ident, $question:expr, $answer:expr, $code:expr, $values:expr) => {
         #[test]
         #[cfg(not(feature = "async-mio"))]
-        fn $getter() -> io::Result<()> {
+        fn $getter() -> ClientResult<()> {
             test_client(
                 &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
                 |client| {
@@ -165,7 +160,7 @@ test_setter!(
 
 #[test]
 #[cfg(not(feature = "async-mio"))]
-fn set_debug() -> io::Result<()> {
+fn set_debug() -> ClientResult<()> {
     test_client(
         &[
             SET_CLIENT_COMMUNICATION,
@@ -341,7 +336,7 @@ test_list!(
 
 #[test]
 #[cfg(not(feature = "async-mio"))]
-fn list_synthesis_voices() -> io::Result<()> {
+fn list_synthesis_voices() -> ClientResult<()> {
     test_client(
         &[
             SET_CLIENT_COMMUNICATION,
@@ -367,7 +362,7 @@ fn list_synthesis_voices() -> io::Result<()> {
 
 #[test]
 #[cfg(not(feature = "async-mio"))]
-fn receive_notification() -> io::Result<()> {
+fn receive_notification() -> ClientResult<()> {
     test_client(
         &[
             SET_CLIENT_COMMUNICATION,

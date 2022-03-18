@@ -7,7 +7,7 @@
 // modified, or distributed except according to those terms.
 
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::thread;
 
 use std::os::unix::net::UnixListener;
@@ -24,13 +24,13 @@ impl Server {
     /// Argument `communication` is an array of pairs. The first item is a list of strings
     /// the server will receive and the second item is the answer.
     pub fn new<P>(
-        socket_path: &P,
+        socket_path: P,
         communication: &[(&'static str, &'static str)],
     ) -> io::Result<Self>
     where
         P: AsRef<Path>,
     {
-        let listener = UnixListener::bind(socket_path)?;
+        let listener = UnixListener::bind(socket_path.as_ref())?;
         Ok(Server {
             listener,
             communication: communication.to_vec(),
@@ -56,7 +56,7 @@ impl Server {
                 if line != *question {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
-                        format!("read <{}> instead of <{}>", dbg!(line), *question),
+                        format!("read <{}> instead of <{}>", line, *question),
                     ));
                 }
             }
@@ -64,11 +64,6 @@ impl Server {
             output.flush()?;
         }
         Ok(())
-    }
-
-    pub fn temporary_path() -> PathBuf {
-        let tid = unsafe { libc::pthread_self() } as u64;
-        std::env::temp_dir().join(format!("ssip-client-test-{}-{}", std::process::id(), tid))
     }
 
     pub fn run<P>(

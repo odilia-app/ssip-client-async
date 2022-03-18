@@ -9,6 +9,9 @@
 #[cfg(feature = "async-mio")]
 use mio::{Events, Poll, Token};
 #[cfg(feature = "async-mio")]
+use std::{slice::Iter, time::Duration};
+
+#[cfg(feature = "async-mio")]
 use ssip_client::*;
 
 #[cfg(feature = "async-mio")]
@@ -18,86 +21,143 @@ mod server;
 use server::Server;
 
 #[cfg(feature = "async-mio")]
-mod utils {
+enum Answer {
+    Str(&'static str),
+    Int(i8),
+}
 
-    use ssip_client::*;
+#[cfg(feature = "async-mio")]
+struct State<'a, 'b> {
+    pub done: bool,
+    pub countdown: usize,
+    pub writable: bool,
+    pub start_get: bool,
+    pub iter_requests: Iter<'a, Request>,
+    pub iter_answers: Iter<'b, Answer>,
+}
 
-    const MAX_RETRIES: u16 = 10;
-
-    pub struct Controler {
-        step: u16,
-        retry: u16,
+#[cfg(feature = "async-mio")]
+impl<'a, 'b> State<'a, 'b> {
+    fn new(iter_requests: Iter<'a, Request>, iter_answers: Iter<'b, Answer>) -> Self {
+        State {
+            done: false,
+            countdown: 50,
+            writable: false,
+            start_get: false,
+            iter_requests,
+            iter_answers,
+        }
     }
 
-    impl Controler {
-        pub fn new() -> Controler {
-            Controler {
-                step: 0,
-                retry: MAX_RETRIES,
-            }
-        }
+    fn terminated(&self) -> bool {
+        self.done || self.countdown == 0
+    }
 
-        pub fn step(&self) -> u16 {
-            self.step
-        }
+    fn must_send(&self) -> bool {
+        self.writable && self.countdown > 0
+    }
 
-        pub fn check_result<V>(&mut self, result: ClientResult<V>) -> Option<V> {
-            match result {
-                Ok(value) => {
-                    self.step += 1;
-                    self.retry = MAX_RETRIES;
-                    Some(value)
-                }
-                Err(ClientError::NotReady) if self.retry > 0 => {
-                    self.retry -= 1;
-                    None
-                }
-                Err(err) => panic!("{:?}", err),
-            }
+    fn next_request(&mut self) -> Option<&Request> {
+        if self.start_get {
+            self.iter_requests.next()
+        } else {
+            None
+        }
+    }
+
+    fn assert_string(&mut self, val: &str) {
+        match self.iter_answers.next() {
+            Some(Answer::Str(expected_val)) => assert_eq!(expected_val, &val),
+            Some(Answer::Int(expected_val)) => panic!(
+                "expecting integer {} instead of string '{}'",
+                expected_val, val
+            ),
+            None => panic!("no more answers"),
+        }
+    }
+
+    fn assert_integer(&mut self, val: i8) {
+        match self.iter_answers.next() {
+            Some(Answer::Int(expected_val)) => assert_eq!(expected_val, &val),
+            Some(Answer::Str(expected_val)) => panic!(
+                "expecting string '{}' instead of integer {}",
+                expected_val, val
+            ),
+            None => panic!("no more answers"),
         }
     }
 }
 
-#[cfg(feature = "async-mio")]
-use utils::Controler;
-
 #[test]
 #[cfg(feature = "async-mio")]
-fn basic_async_communication() -> std::io::Result<()> {
-    const COMMUNICATION: [(&str, &str); 1] = [(
-        "SET self CLIENT_NAME test:test:main\r\n",
-        "208 OK CLIENT NAME SET\r\n",
-    )];
+fn basic_async_communication() -> ClientResult<()> {
+    const COMMUNICATION: [(&str, &str); 5] = [
+        (
+            "SET self CLIENT_NAME test:test:main\r\n",
+            "208 OK CLIENT NAME SET\r\n",
+        ),
+        ("SET self LANGUAGE en\r\n", "201 OK LANGUAGE SET\r\n"),
+        ("STOP self\r\n", "210 OK STOPPED\r\n"),
+        (
+            "GET OUTPUT_MODULE\r\n",
+            "251-espeak\r\n251 OK GET RETURNED\r\n",
+        ),
+        ("GET RATE\r\n", "251-10\r\n251 OK GET RETURNED\r\n"),
+    ];
 
-    let socket_path = Server::temporary_path();
+    let get_requests = vec![Request::GetOutputModule, Request::GetRate];
+    let get_answers = vec![Answer::Str("espeak"), Answer::Int(10)];
+    let mut state = State::new(get_requests.iter(), get_answers.iter());
+
+    let socket_dir = tempfile::tempdir()?;
+    let socket_path = socket_dir.path().join("basic_async_communication.socket");
     assert!(!socket_path.exists());
-    let server_path = socket_path.clone();
-    let result = std::panic::catch_unwind(move || -> std::io::Result<u16> {
-        let handle = Server::run(&server_path, &COMMUNICATION);
-        let mut poll = Poll::new()?;
-        let mut events = Events::with_capacity(128);
-        let mut client = fifo::Builder::new().path(&server_path).build().unwrap();
-        let input_token = Token(0);
-        let output_token = Token(1);
-        client.register(&poll, input_token, output_token).unwrap();
-        let mut controler = Controler::new();
-        while controler.step() < 2 {
-            poll.poll(&mut events, None)?;
-            for event in &events {
-                if event.token() == output_token && event.is_writable() && controler.step() == 0 {
-                    controler.check_result(client.set_client_name(ClientName::new("test", "test")));
-                } else if event.token() == input_token
-                    && event.is_readable()
-                    && controler.step() == 1
-                {
-                    controler.check_result(client.check_client_name_set());
+    let handle = Server::run(&socket_path, &COMMUNICATION);
+    let mut poll = Poll::new()?;
+    let mut events = Events::with_capacity(128);
+    let mut client = AsyncClient::new(fifo::Builder::new().path(&socket_path).build()?);
+    let input_token = Token(0);
+    let output_token = Token(1);
+    let timeout = Duration::new(0, 500 * 1000 * 1000 /* 500 ms */);
+    client.register(&poll, input_token, output_token).unwrap();
+    client.push(Request::SetName(ClientName::new("test", "test")));
+    while !state.terminated() {
+        if !state.writable || !client.has_next() {
+            poll.poll(&mut events, Some(timeout))?;
+        }
+        state.countdown -= 1;
+        for event in &events {
+            let token = event.token();
+            if token == input_token {
+                match dbg!(client.receive_next()?) {
+                    Response::ClientNameSet => {
+                        client.push(Request::SetLanguage(ClientScope::Current, "en".to_string()))
+                    }
+                    Response::LanguageSet => client.push(Request::Stop(MessageScope::Last)),
+                    Response::Stopped => state.start_get = true,
+                    Response::GetString(val) => state.assert_string(&val),
+                    Response::GetInteger(val) => state.assert_integer(val),
+                    result => panic!("Unexpected response: {:?}", result),
                 }
+                if let Some(request) = state.next_request() {
+                    client.push(request.clone());
+                } else if state.start_get {
+                    state.done = true; // No more get request
+                }
+            } else if token == output_token {
+                state.writable = true;
             }
         }
-        handle.join().unwrap().unwrap();
-        Ok(controler.step())
-    });
-    std::fs::remove_file(socket_path)?;
-    assert_eq!(2, result.unwrap().unwrap());
+        if state.must_send() {
+            match client.send_next() {
+                Ok(()) => (),
+                Err(ClientError::NotReady) => state.writable = false,
+                err => return err,
+            }
+        }
+    }
+    handle.join().unwrap().unwrap();
+    assert!(state.countdown > 0);
+    socket_dir.close()?;
     Ok(())
 }
