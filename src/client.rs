@@ -63,7 +63,7 @@ pub type ClientResult<T> = Result<T, ClientError>;
 pub type ClientStatus = ClientResult<StatusLine>;
 
 /// Client name
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ClientName {
     pub user: String,
     pub application: String,
@@ -417,6 +417,8 @@ impl<S: Read + Write + Source> Client<S> {
         "SET {} VOLUME {}"
     );
 
+    client_send!(get_volume, "Get the current volume.", "GET VOLUME");
+
     client_send!(
         set_pause_context,
         "Set the number of (more or less) sentences that should be repeated after a previously paused text is resumed.",
@@ -432,8 +434,6 @@ impl<S: Read + Write + Source> Client<S> {
         value,
         "SET {} HISTORY {}"
     );
-
-    client_send!(get_volume, "Get the current volume.", "GET VOLUME");
 
     client_send!(block_begin, "Open a block", "BLOCK BEGIN");
 

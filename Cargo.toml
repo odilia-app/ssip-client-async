@@ -23,3 +23,5 @@ async-mio = ["mio/net", "mio/os-poll"]
 [dev-dependencies]
 libc = "0"
 mio = { version = "0.8", features = ["os-poll", "os-ext"] }
+tempfile = "3"
+

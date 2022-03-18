@@ -22,7 +22,7 @@ pub type MessageId = String;
 pub type ClientId = String;
 
 /// Message identifiers
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MessageScope {
     /// Last message from current client
     Last,
@@ -33,7 +33,7 @@ pub enum MessageScope {
 }
 
 /// Client identifiers
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ClientScope {
     /// Current client
     Current,
@@ -44,7 +44,7 @@ pub enum ClientScope {
 }
 
 /// Priority
-#[derive(StrumDisplay, Debug)]
+#[derive(StrumDisplay, Debug, Clone)]
 pub enum Priority {
     #[strum(serialize = "progress")]
     Progress,
@@ -59,7 +59,7 @@ pub enum Priority {
 }
 
 /// Punctuation mode.
-#[derive(StrumDisplay, Debug)]
+#[derive(StrumDisplay, Debug, Clone)]
 pub enum PunctuationMode {
     #[strum(serialize = "none")]
     None,
@@ -72,7 +72,7 @@ pub enum PunctuationMode {
 }
 
 /// Capital letters recognition mode.
-#[derive(StrumDisplay, Debug)]
+#[derive(StrumDisplay, Debug, Clone)]
 pub enum CapitalLettersRecognitionMode {
     #[strum(serialize = "none")]
     None,
@@ -83,7 +83,7 @@ pub enum CapitalLettersRecognitionMode {
 }
 
 /// Symbolic key names
-#[derive(StrumDisplay, Debug)]
+#[derive(StrumDisplay, Debug, Clone)]
 pub enum KeyName {
     #[strum(serialize = "space")]
     Space,
@@ -230,7 +230,7 @@ pub enum KeyName {
 }
 
 /// Notification type
-#[derive(StrumDisplay, Debug)]
+#[derive(StrumDisplay, Debug, Clone)]
 pub enum NotificationType {
     #[strum(serialize = "begin")]
     Begin,
@@ -249,7 +249,7 @@ pub enum NotificationType {
 }
 
 /// Notification event type (returned by server)
-#[derive(StrumDisplay, Debug)]
+#[derive(StrumDisplay, Debug, Clone)]
 pub enum EventType {
     Begin,
     End,
@@ -260,7 +260,7 @@ pub enum EventType {
 }
 
 /// Event identifier
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EventId {
     // Message id
     pub message: String,
@@ -279,7 +279,7 @@ impl EventId {
 }
 
 /// Notification event
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Event {
     pub ntype: EventType,
     pub id: EventId,

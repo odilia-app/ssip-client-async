@@ -14,18 +14,53 @@ use std::io::{self, Read, Write};
 use crate::{
     client::{Client, ClientError, ClientName, ClientResult},
     constants::*,
-    types::{EventId, SynthesisVoice},
+    types::*,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// Request for SSIP server.
 pub enum Request {
     SetName(ClientName),
+    // Speech related requests
     Speak,
     SendLine(String),
     SendLines(Vec<String>),
     SendChar(char),
+    // Flow control
+    Stop(MessageScope),
+    Cancel(MessageScope),
+    Pause(MessageScope),
+    Resume(MessageScope),
+    // Setter and getter
+    SetPriority(Priority),
+    SetDebug(bool),
+    SetOutputModule(ClientScope, String),
+    GetOutputModule,
+    ListOutputModule,
+    SetLanguage(ClientScope, String),
+    GetLanguage,
+    SetSsmlMode(bool),
+    SetPunctuationMode(ClientScope, PunctuationMode),
+    SetSpelling(ClientScope, bool),
+    SetCapitalLettersRecognitionMode(ClientScope, CapitalLettersRecognitionMode),
+    SetVoiceType(ClientScope, String),
+    GetVoiceType,
+    ListVoiceTypes,
+    SetSynthesisVoice(ClientScope, String),
+    ListSynthesisVoices,
+    SetRate(ClientScope, i8),
+    GetRate,
+    SetPitch(ClientScope, i8),
+    GetPitch,
+    SetVolume(ClientScope, i8),
+    GetVolume,
+    SetPauseContext(ClientScope, u8),
+    SetHistory(ClientScope, bool),
+    Begin,
+    End,
     Quit,
+    EnableNotification(NotificationType),
+    DisableNotification(NotificationType),
 }
 
 #[derive(Debug)]
@@ -73,7 +108,7 @@ pub enum Response {
     VoicesListSent(Vec<SynthesisVoice>), // 249
     OutputModulesListSent(Vec<String>),  // 250
     GetString(String),                   // 251
-    GetInteger(u8),                      // 251
+    GetInteger(i8),                      // 251
     InsideBlock,                         // 260
     OutsideBlock,                        // 261
     NotImplemented,                      // 299
@@ -87,12 +122,18 @@ pub enum Response {
 
 const INITIAL_REQUEST_QUEUE_CAPACITY: usize = 4;
 
+enum GetType {
+    StringType,
+    IntegerType,
+}
+
 /// Asynchronous client based on `mio`.
 ///
 ///
 pub struct AsyncClient<S: Read + Write + Source> {
     client: Client<S>,
     requests: VecDeque<Request>,
+    get_types: VecDeque<GetType>,
 }
 
 impl<S: Read + Write + Source> AsyncClient<S> {
@@ -101,6 +142,7 @@ impl<S: Read + Write + Source> AsyncClient<S> {
         Self {
             client,
             requests: VecDeque::with_capacity(INITIAL_REQUEST_QUEUE_CAPACITY),
+            get_types: VecDeque::with_capacity(INITIAL_REQUEST_QUEUE_CAPACITY),
         }
     }
 
@@ -133,6 +175,16 @@ impl<S: Read + Write + Source> AsyncClient<S> {
         !self.requests.is_empty()
     }
 
+    /// Next get is a string.
+    fn push_get_string(&mut self) {
+        self.get_types.push_back(GetType::StringType);
+    }
+
+    /// Next get is an integer.
+    fn push_get_int(&mut self) {
+        self.get_types.push_back(GetType::IntegerType);
+    }
+
     /// Write one pending request if any.
     ///
     /// Instance of `mio::Poll` generates a writable event only once until the socket returns `WouldBlock`.
@@ -151,7 +203,67 @@ impl<S: Read + Write + Source> AsyncClient<S> {
                         .as_slice(),
                 ),
                 Request::SendChar(ch) => self.client.send_char(ch),
+                Request::Stop(scope) => self.client.stop(scope),
+                Request::Cancel(scope) => self.client.cancel(scope),
+                Request::Pause(scope) => self.client.pause(scope),
+                Request::Resume(scope) => self.client.resume(scope),
+                Request::SetPriority(prio) => self.client.set_priority(prio),
+                Request::SetDebug(value) => self.client.set_debug(value),
+                Request::SetOutputModule(scope, value) => {
+                    self.client.set_output_module(scope, &value)
+                }
+                Request::GetOutputModule => {
+                    self.push_get_string();
+                    self.client.get_output_module()
+                }
+                Request::ListOutputModule => self.client.list_output_modules(),
+                Request::SetLanguage(scope, lang) => self.client.set_language(scope, &lang),
+                Request::GetLanguage => {
+                    self.push_get_string();
+                    self.client.get_language()
+                }
+                Request::SetSsmlMode(value) => self.client.set_ssml_mode(value),
+                Request::SetPunctuationMode(scope, mode) => {
+                    self.client.set_punctuation_mode(scope, mode)
+                }
+                Request::SetSpelling(scope, value) => self.client.set_spelling(scope, value),
+                Request::SetCapitalLettersRecognitionMode(scope, mode) => {
+                    self.client.set_capital_letter_recogn(scope, mode)
+                }
+                Request::SetVoiceType(scope, value) => self.client.set_voice_type(scope, &value),
+                Request::GetVoiceType => {
+                    self.push_get_string();
+                    self.client.get_voice_type()
+                }
+                Request::ListVoiceTypes => self.client.list_voice_types(),
+                Request::SetSynthesisVoice(scope, value) => {
+                    self.client.set_synthesis_voice(scope, &value)
+                }
+                Request::ListSynthesisVoices => self.client.list_synthesis_voices(),
+                Request::SetRate(scope, value) => self.client.set_rate(scope, value),
+                Request::GetRate => {
+                    self.push_get_int();
+                    self.client.get_rate()
+                }
+                Request::SetPitch(scope, value) => self.client.set_pitch(scope, value),
+                Request::GetPitch => {
+                    self.push_get_int();
+                    self.client.get_pitch()
+                }
+                Request::SetVolume(scope, value) => self.client.set_volume(scope, value),
+                Request::GetVolume => {
+                    self.push_get_int();
+                    self.client.get_volume()
+                }
+                Request::SetPauseContext(scope, value) => {
+                    self.client.set_pause_context(scope, value)
+                }
+                Request::SetHistory(scope, value) => self.client.set_history(scope, value),
                 Request::Quit => self.client.quit(),
+                Request::Begin => self.client.block_begin(),
+                Request::End => self.client.block_end(),
+                Request::EnableNotification(ntype) => self.client.enable_notification(ntype),
+                Request::DisableNotification(ntype) => self.client.disable_notification(ntype),
             }
             .map(|_| ()),
             None => Ok(()),
@@ -225,10 +337,17 @@ impl<S: Read + Write + Source> AsyncClient<S> {
             OK_OUTPUT_MODULES_LIST_SENT => Ok(Response::OutputModulesListSent(lines)),
             OK_GET => {
                 let sval = Client::<S>::parse_single_value(&lines)?;
-                Ok(match sval.parse::<u8>() {
-                    Ok(uval) => Response::GetInteger(uval),
-                    Err(_) => Response::GetString(sval),
-                })
+                match self
+                    .get_types
+                    .pop_front()
+                    .expect("internal error: get_types is empty")
+                {
+                    GetType::StringType => Ok(Response::GetString(sval)),
+                    GetType::IntegerType => sval
+                        .parse::<i8>()
+                        .map(|uval| Response::GetInteger(uval))
+                        .map_err(|_| ClientError::InvalidType),
+                }
             }
             OK_INSIDE_BLOCK => Ok(Response::InsideBlock),
             OK_OUTSIDE_BLOCK => Ok(Response::OutsideBlock),

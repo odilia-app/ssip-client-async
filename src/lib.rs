@@ -40,7 +40,6 @@ pub use client::Client;
 
 pub use client::{ClientError, ClientName, ClientResult, ClientStatus};
 pub use constants::*;
-pub use types::StatusLine;
 pub use types::*;
 
 #[cfg(any(feature = "async-mio", doc))]

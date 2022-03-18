@@ -80,6 +80,7 @@ pub(crate) fn receive_answer(
                     return Err(invalid_input!("expecting space or dash, got {}.", ch));
                 }
             },
+            None if line.is_empty() => return Err(invalid_input!("empty line")),
             None => return Err(invalid_input!("line too short: {}", line)),
         }
     }
