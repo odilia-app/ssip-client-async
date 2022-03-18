@@ -45,5 +45,5 @@ pub use types::*;
 #[cfg(any(feature = "async-mio", doc))]
 mod async_mio;
 
-#[cfg(feature = "async-mio")]
+#[cfg(any(feature = "async-mio", doc))]
 pub use async_mio::AsyncClient;

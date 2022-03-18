@@ -7,14 +7,27 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-use mio::event::Source;
 use std::collections::VecDeque;
 use std::io::{self, Read, Write};
 
 use crate::{
-    client::{Client, Request, Response},
+    client::{Client, Request, Response, Source},
     types::*,
 };
+
+// Hack to generate the doc. There must be a better way.
+#[cfg(all(not(feature = "async-mio"), doc))]
+mod mio {
+    /// Polls for readiness events on all registered values.
+    ///
+    /// See [`mio::Poll`](https://docs.rs/mio/latest/mio/struct.Poll.html#)
+    pub struct Poll {}
+
+    /// Source identifier.
+    ///
+    /// See [`mio::Token`](https://docs.rs/mio/latest/mio/struct.Token.html#).
+    pub struct Token(pub usize);
+}
 
 const INITIAL_REQUEST_QUEUE_CAPACITY: usize = 4;
 

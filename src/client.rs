@@ -17,10 +17,10 @@ use crate::types::*;
 
 // Trick to have common implementation for std and mio streams..
 #[cfg(not(feature = "async-mio"))]
-use std::fmt::Debug as Source;
+pub(crate) use std::fmt::Debug as Source;
 
 #[cfg(feature = "async-mio")]
-use mio::event::Source;
+pub(crate) use mio::event::Source;
 
 /// Convert boolean to ON or OFF
 fn on_off(value: bool) -> &'static str {
@@ -165,8 +165,8 @@ macro_rules! send_range {
 /// SSIP client on generic stream
 ///
 /// There are two ways to send requests and receive responses:
-/// * Either with the generic [`send`] and [`receive`]
-/// * Or with the specific methods such as [`set_rate`], ..., [`get_rate`], ...
+/// * Either with the generic [`Client::send`] and [`Client::receive`]
+/// * Or with the specific methods such as [`Client::set_rate`], ..., [`Client::get_rate`], ...
 pub struct Client<S: Read + Write + Source> {
     input: io::BufReader<S>,
     output: io::BufWriter<S>,
