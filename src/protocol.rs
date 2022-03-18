@@ -9,9 +9,9 @@
 
 use log::debug;
 use std::io::{self, BufRead, Write};
+use std::str::FromStr;
 
-use crate::client::{ClientError, ClientResult, ClientStatus};
-use crate::types::StatusLine;
+use crate::types::{ClientError, ClientResult, ClientStatus, EventId, StatusLine, SynthesisVoice};
 
 macro_rules! invalid_input {
     ($msg:expr) => {
@@ -20,6 +20,33 @@ macro_rules! invalid_input {
     ($fmt:expr, $($arg:tt)*) => {
         invalid_input!(format!($fmt, $($arg)*).as_str())
     };
+}
+
+/// Return the only string in the list or an error if there is no line or too many.
+pub(crate) fn parse_single_value(lines: &[String]) -> ClientResult<String> {
+    match lines.len() {
+        0 => Err(ClientError::TooFewLines),
+        1 => Ok(lines[0].to_string()),
+        _ => Err(ClientError::TooManyLines),
+    }
+}
+
+/// Convert two lines of the response in an event id
+pub(crate) fn parse_event_id(lines: &[String]) -> ClientResult<EventId> {
+    match lines.len() {
+        0 | 1 => Err(ClientError::TooFewLines),
+        2 => Ok(EventId::new(&lines[0], &lines[1])),
+        _ => Err(ClientError::TooManyLines),
+    }
+}
+
+pub(crate) fn parse_synthesis_voices(lines: &[String]) -> ClientResult<Vec<SynthesisVoice>> {
+    let mut voices = Vec::new();
+    for name in lines.iter() {
+        let voice = SynthesisVoice::from_str(name.as_str())?;
+        voices.push(voice);
+    }
+    Ok(voices)
 }
 
 /// Write lines separated by CRLF.
@@ -33,7 +60,7 @@ pub(crate) fn write_lines(output: &mut dyn Write, lines: &[&str]) -> ClientResul
 }
 
 /// Write lines separated by CRLF and flush the output.
-pub(crate) fn send_lines(output: &mut dyn Write, lines: &[&str]) -> ClientResult<()> {
+pub(crate) fn flush_lines(output: &mut dyn Write, lines: &[&str]) -> ClientResult<()> {
     write_lines(output, lines)?;
     output.flush()?;
     Ok(())
@@ -91,7 +118,7 @@ mod tests {
 
     use std::io::BufReader;
 
-    use super::{receive_answer, ClientError};
+    use super::{receive_answer, ClientError, ClientResult};
 
     #[test]
     fn single_ok_status_line() {
@@ -135,5 +162,74 @@ mod tests {
             vec!["afrikaans\taf\tnone", "en-rhotic\ten\tr"],
             lines.as_slice()
         );
+    }
+
+    #[test]
+    fn parse_single_value() -> ClientResult<()> {
+        let no_lines = Vec::new();
+        assert!(matches!(
+            super::parse_single_value(&no_lines),
+            Err(ClientError::TooFewLines)
+        ));
+
+        let one = String::from("one");
+        let one_line = vec![one.to_owned()];
+        assert_eq!(one, super::parse_single_value(&one_line)?);
+
+        let two_lines = vec![one.to_owned(), String::from("two")];
+        assert!(matches!(
+            super::parse_single_value(&two_lines),
+            Err(ClientError::TooManyLines)
+        ));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_event_id() -> ClientResult<()> {
+        let no_lines = Vec::new();
+        assert!(matches!(
+            super::parse_event_id(&no_lines),
+            Err(ClientError::TooFewLines)
+        ));
+
+        let one_line = vec![String::from("one")];
+        assert!(matches!(
+            super::parse_event_id(&one_line),
+            Err(ClientError::TooFewLines)
+        ));
+
+        let mid = String::from("message");
+        let cid = String::from("client");
+        let two_lines = vec![mid.to_owned(), cid.to_owned()];
+        let event_id = super::parse_event_id(&two_lines)?;
+        assert_eq!(mid, event_id.message);
+        assert_eq!(cid, event_id.client);
+
+        let three_lines = vec![
+            String::from("one"),
+            String::from("two"),
+            String::from("three"),
+        ];
+        assert!(matches!(
+            super::parse_event_id(&three_lines),
+            Err(ClientError::TooManyLines)
+        ));
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_synthesis_voices() -> ClientResult<()> {
+        let lines = ["en", "afrikaans\taf", "lancashire\ten\tuk-north"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
+        let voices = super::parse_synthesis_voices(&lines)?;
+        assert_eq!(3, voices.len());
+        assert_eq!("en", voices[0].name.as_str());
+        assert_eq!(Some(String::from("af")), voices[1].language);
+        assert_eq!(Some(String::from("uk-north")), voices[2].dialect);
+        Ok(())
     }
 }

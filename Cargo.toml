@@ -1,6 +1,6 @@
 [package]
 name = "ssip-client"
-version = "0.4.1"
+version = "0.5.0"
 authors = ["Laurent Pelecq <lpelecq+rust@circoise.eu>"]
 edition = "2018"
 description = "Client API for Speech Dispatcher"

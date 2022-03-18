@@ -8,15 +8,12 @@
 // modified, or distributed except according to those terms.
 
 use std::io::{self, Read, Write};
-use std::str::FromStr;
-use thiserror::Error as ThisError;
 
 use crate::constants::*;
-use crate::protocol::{send_lines, write_lines};
-use crate::types::{
-    CapitalLettersRecognitionMode, ClientScope, Event, KeyName, MessageId, MessageScope,
-    NotificationType, Priority, PunctuationMode, ReturnCode, StatusLine, SynthesisVoice,
+use crate::protocol::{
+    flush_lines, parse_event_id, parse_single_value, parse_synthesis_voices, write_lines,
 };
+use crate::types::*;
 
 // Trick to have common implementation for std and mio streams..
 #[cfg(not(feature = "async-mio"))]
@@ -24,65 +21,6 @@ use std::fmt::Debug as Source;
 
 #[cfg(feature = "async-mio")]
 use mio::event::Source;
-
-/// Client error, either I/O error or SSIP error.
-#[derive(ThisError, Debug)]
-pub enum ClientError {
-    #[error("Invalid type")]
-    InvalidType,
-    #[error("I/O: {0}")]
-    Io(io::Error),
-    #[error("Not ready")]
-    NotReady,
-    #[error("SSIP: {0}")]
-    Ssip(StatusLine),
-    #[error("Too few lines")]
-    TooFewLines,
-    #[error("Too many lines")]
-    TooManyLines,
-    #[error("Truncated message")]
-    TruncatedMessage,
-    #[error("Unexpected status: {0}")]
-    UnexpectedStatus(ReturnCode),
-}
-
-impl From<io::Error> for ClientError {
-    fn from(err: io::Error) -> Self {
-        if err.kind() == io::ErrorKind::WouldBlock {
-            ClientError::NotReady
-        } else {
-            ClientError::Io(err)
-        }
-    }
-}
-
-/// Client result.
-pub type ClientResult<T> = Result<T, ClientError>;
-
-/// Client result consisting in a single status line
-pub type ClientStatus = ClientResult<StatusLine>;
-
-/// Client name
-#[derive(Debug, Clone)]
-pub struct ClientName {
-    pub user: String,
-    pub application: String,
-    pub component: String,
-}
-
-impl ClientName {
-    pub fn new(user: &str, application: &str) -> Self {
-        ClientName::with_component(user, application, "main")
-    }
-
-    pub fn with_component(user: &str, application: &str, component: &str) -> Self {
-        ClientName {
-            user: user.to_string(),
-            application: application.to_string(),
-            component: component.to_string(),
-        }
-    }
-}
 
 /// Convert boolean to ON or OFF
 fn on_off(value: bool) -> &'static str {
@@ -93,83 +31,142 @@ fn on_off(value: bool) -> &'static str {
     }
 }
 
-macro_rules! client_send {
-    ($name:ident, $doc:expr, $scope:ident, $value_name:ident as $value_type:ty, $fmt:expr, $value:expr) => {
-        #[doc=$doc]
-        pub fn $name(
-            &mut self,
-            $scope: ClientScope,
-            $value_name: $value_type,
-        ) -> ClientResult<&mut Client<S>> {
-            let line = match $scope {
-                ClientScope::Current => format!($fmt, "self", $value),
-                ClientScope::All => format!($fmt, "all", $value),
-                ClientScope::Client(id) => format!($fmt, id, $value),
-            };
+#[derive(Debug, Clone)]
+/// Request for SSIP server.
+pub enum Request {
+    SetName(ClientName),
+    // Speech related requests
+    Speak,
+    SendLine(String),
+    SendLines(Vec<String>),
+    SpeakChar(char),
+    SpeakKey(KeyName),
+    // Flow control
+    Stop(MessageScope),
+    Cancel(MessageScope),
+    Pause(MessageScope),
+    Resume(MessageScope),
+    // Setter and getter
+    SetPriority(Priority),
+    SetDebug(bool),
+    SetOutputModule(ClientScope, String),
+    GetOutputModule,
+    ListOutputModules,
+    SetLanguage(ClientScope, String),
+    GetLanguage,
+    SetSsmlMode(bool),
+    SetPunctuationMode(ClientScope, PunctuationMode),
+    SetSpelling(ClientScope, bool),
+    SetCapitalLettersRecognitionMode(ClientScope, CapitalLettersRecognitionMode),
+    SetVoiceType(ClientScope, String),
+    GetVoiceType,
+    ListVoiceTypes,
+    SetSynthesisVoice(ClientScope, String),
+    ListSynthesisVoices,
+    SetRate(ClientScope, i8),
+    GetRate,
+    SetPitch(ClientScope, i8),
+    GetPitch,
+    SetVolume(ClientScope, i8),
+    GetVolume,
+    SetPauseContext(ClientScope, u8),
+    SetHistory(ClientScope, bool),
+    SetNotification(NotificationType, bool),
+    Begin,
+    End,
+    Quit,
+}
 
-            send_lines(&mut self.output, &[line.as_str()])?;
-            Ok(self)
-        }
+#[derive(Debug)]
+/// Response from SSIP server.
+pub enum Response {
+    LanguageSet,                         // 201
+    PrioritySet,                         // 202
+    RateSet,                             // 203
+    PitchSet,                            // 204
+    PunctuationSet,                      // 205
+    CapLetRecognSet,                     // 206
+    SpellingSet,                         // 207
+    ClientNameSet,                       // 208
+    VoiceSet,                            // 209
+    Stopped,                             // 210
+    Paused,                              // 211
+    Resumed,                             // 212
+    Canceled,                            // 213
+    TableSet,                            // 215
+    OutputModuleSet,                     // 216
+    PauseContextSet,                     // 217
+    VolumeSet,                           // 218
+    SsmlModeSet,                         // 219
+    NotificationSet,                     // 220
+    PitchRangeSet,                       // 263
+    DebugSet,                            // 262
+    HistoryCurSetFirst,                  // 220
+    HistoryCurSetLast,                   // 221
+    HistoryCurSetPos,                    // 222
+    HistoryCurMoveFor,                   // 223
+    HistoryCurMoveBack,                  // 224
+    MessageQueued,                       // 225,
+    SoundIconQueued,                     // 226
+    MessageCanceled,                     // 227
+    ReceivingData,                       // 230
+    Bye,                                 // 231
+    HistoryClientListSent(Vec<String>),  // 240
+    HistoryMsgsListSent(Vec<String>),    // 241
+    HistoryLastMsg(String),              // 242
+    HistoryCurPosRet(String),            // 243
+    TableListSent(Vec<String>),          // 244
+    HistoryClientIdSent(String),         // 245
+    MessageTextSent,                     // 246
+    HelpSent(Vec<String>),               // 248
+    VoicesListSent(Vec<SynthesisVoice>), // 249
+    OutputModulesListSent(Vec<String>),  // 250
+    Get(String),                         // 251
+    InsideBlock,                         // 260
+    OutsideBlock,                        // 261
+    NotImplemented,                      // 299
+    EventIndexMark(EventId, String),     // 700
+    EventBegin(EventId),                 // 701
+    EventEnd(EventId),                   // 702
+    EventCanceled(EventId),              // 703
+    EventPaused(EventId),                // 704
+    EventResumed(EventId),               // 705
+}
+
+macro_rules! send_one_line {
+    ($self:expr, $fmt:expr, $( $arg:expr ),+) => {
+        flush_lines(&mut $self.output, &[format!($fmt, $( $arg ),+).as_str()])
     };
-    ($name:ident, $doc:expr, $scope:ident, $value_name:ident as $value_type:ty, $fmt:expr) => {
-        client_send!(
-            $name,
-            $doc,
-            $scope,
-            $value_name as $value_type,
-            $fmt,
-            $value_name
-        );
+    ($self:expr, $fmt:expr) => {
+        flush_lines(&mut $self.output, &[$fmt])
+    }
+}
+
+macro_rules! send_toggle {
+    ($output:expr, $fmt:expr, $val:expr) => {
+        send_one_line!($output, $fmt, on_off($val))
     };
-    ($name:ident, $doc:expr, $value_name:ident as $value_type:ty, $fmt:expr, $value:expr) => {
-        #[doc=$doc]
-        pub fn $name(&mut self, $value_name: $value_type) -> ClientResult<&mut Client<S>> {
-            send_lines(&mut self.output, &[format!($fmt, $value).as_str()])?;
-            Ok(self)
-        }
-    };
-    ($name:ident, $doc:expr, $value_name:ident as $value_type:ty, $fmt:expr) => {
-        client_send!($name, $doc, $value_name as $value_type, $fmt, $value_name);
-    };
-    ($name:ident, $doc:expr, $line:expr) => {
-        #[doc=$doc]
-        pub fn $name(&mut self) -> ClientResult<&mut Client<S>> {
-            send_lines(&mut self.output, &[$line])?;
-            Ok(self)
-        }
+    ($output:expr, $fmt:expr, $arg:expr, $val:expr) => {
+        send_one_line!($output, $fmt, $arg, on_off($val))
     };
 }
 
-macro_rules! client_send_boolean {
-    ($name:ident, $doc:expr, $scope:ident, $value_name:ident, $fmt:expr) => {
-        client_send!(
-            $name,
-            $doc,
-            $scope,
-            $value_name as bool,
+macro_rules! send_range {
+    ($output:expr, $fmt:expr, $scope:expr, $val:expr) => {
+        send_one_line!(
+            $output,
             $fmt,
-            on_off($value_name)
-        );
-    };
-    ($name:ident, $doc:expr, $value_name:ident, $fmt:expr) => {
-        client_send!($name, $doc, $value_name as bool, $fmt, on_off($value_name));
-    };
-}
-
-macro_rules! client_send_range {
-    ($name:ident, $doc:expr, $scope:ident, $value_name:ident, $fmt:expr) => {
-        client_send!(
-            $name,
-            $doc,
             $scope,
-            $value_name as i8,
-            $fmt,
-            std::cmp::max(-100, std::cmp::min(100, $value_name))
-        );
+            std::cmp::max(-100, std::cmp::min(100, $val))
+        )
     };
 }
 
 /// SSIP client on generic stream
+///
+/// There are two ways to send requests and receive responses:
+/// * Either with the generic [`send`] and [`receive`]
+/// * Or with the specific methods such as [`set_rate`], ..., [`get_rate`], ...
 pub struct Client<S: Read + Write + Source> {
     input: io::BufReader<S>,
     output: io::BufWriter<S>,
@@ -182,282 +179,379 @@ impl<S: Read + Write + Source> Client<S> {
         Self { input, output }
     }
 
-    /// Return the only string in the list or an error if there is no line or too many.
-    pub(crate) fn parse_single_value(lines: &[String]) -> ClientResult<String> {
-        match lines.len() {
-            0 => Err(ClientError::TooFewLines),
-            1 => Ok(lines[0].to_string()),
-            _ => Err(ClientError::TooManyLines),
-        }
+    /// Send lines of text (terminated by a single dot).
+    pub fn send_lines(&mut self, lines: &[String]) -> ClientResult<&mut Self> {
+        const END_OF_DATA: [&str; 1] = ["."];
+        write_lines(
+            &mut self.output,
+            lines
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<&str>>()
+                .as_slice(),
+        )?;
+        flush_lines(&mut self.output, &END_OF_DATA)?;
+        Ok(self)
     }
 
-    pub(crate) fn parse_synthesis_voices(lines: &[String]) -> ClientResult<Vec<SynthesisVoice>> {
-        let mut voices = Vec::new();
-        for name in lines.iter() {
-            let voice = SynthesisVoice::from_str(name.as_str())?;
-            voices.push(voice);
-        }
-        Ok(voices)
+    /// Send one line of text (terminated by a single dot).
+    pub fn send_line(&mut self, line: &str) -> ClientResult<&mut Self> {
+        const END_OF_DATA: &str = ".";
+        flush_lines(&mut self.output, &[line, END_OF_DATA])?;
+        Ok(self)
+    }
+
+    /// Send a request
+    pub fn send(&mut self, request: Request) -> ClientResult<&mut Self> {
+        match request {
+            Request::SetName(client_name) => send_one_line!(
+                self,
+                "SET self CLIENT_NAME {}:{}:{}",
+                client_name.user,
+                client_name.application,
+                client_name.component
+            ),
+            Request::Speak => send_one_line!(self, "SPEAK"),
+            Request::SendLine(line) => self.send_line(&line).map(|_| ()),
+            Request::SendLines(lines) => self.send_lines(&lines).map(|_| ()),
+            Request::SpeakChar(ch) => send_one_line!(self, "CHAR {}", ch),
+            Request::SpeakKey(key) => send_one_line!(self, "KEY {}", key),
+            Request::Stop(scope) => send_one_line!(self, "STOP {}", scope),
+            Request::Cancel(scope) => send_one_line!(self, "CANCEL {}", scope),
+            Request::Pause(scope) => send_one_line!(self, "PAUSE {}", scope),
+            Request::Resume(scope) => send_one_line!(self, "RESUME {}", scope),
+            Request::SetPriority(prio) => send_one_line!(self, "SET self PRIORITY {}", prio),
+            Request::SetDebug(value) => send_toggle!(self, "SET all DEBUG {}", value),
+            Request::SetOutputModule(scope, value) => {
+                send_one_line!(self, "SET {} OUTPUT_MODULE {}", scope, value)
+            }
+            Request::GetOutputModule => send_one_line!(self, "GET OUTPUT_MODULE"),
+            Request::ListOutputModules => send_one_line!(self, "LIST OUTPUT_MODULES"),
+            Request::SetLanguage(scope, lang) => {
+                send_one_line!(self, "SET {} LANGUAGE {}", scope, lang)
+            }
+            Request::GetLanguage => send_one_line!(self, "GET LANGUAGE"),
+            Request::SetSsmlMode(value) => send_toggle!(self, "SET self SSML_MODE {}", value),
+            Request::SetPunctuationMode(scope, mode) => {
+                send_one_line!(self, "SET {} PUNCTUATION {}", scope, mode)
+            }
+            Request::SetSpelling(scope, value) => {
+                send_toggle!(self, "SET {} SPELLING {}", scope, value)
+            }
+            Request::SetCapitalLettersRecognitionMode(scope, mode) => {
+                send_one_line!(self, "SET {} CAP_LET_RECOGN {}", scope, mode)
+            }
+            Request::SetVoiceType(scope, value) => {
+                send_one_line!(self, "SET {} VOICE_TYPE {}", scope, value)
+            }
+            Request::GetVoiceType => send_one_line!(self, "GET VOICE_TYPE"),
+            Request::ListVoiceTypes => send_one_line!(self, "LIST VOICES"),
+            Request::SetSynthesisVoice(scope, value) => {
+                send_one_line!(self, "SET {} SYNTHESIS_VOICE {}", scope, value)
+            }
+            Request::ListSynthesisVoices => send_one_line!(self, "LIST SYNTHESIS_VOICES"),
+            Request::SetRate(scope, value) => send_range!(self, "SET {} RATE {}", scope, value),
+            Request::GetRate => send_one_line!(self, "GET RATE"),
+            Request::SetPitch(scope, value) => send_range!(self, "SET {} PITCH {}", scope, value),
+            Request::GetPitch => send_one_line!(self, "GET PITCH"),
+            Request::SetVolume(scope, value) => {
+                send_range!(self, "SET {} VOLUME {}", scope, value)
+            }
+            Request::GetVolume => send_one_line!(self, "GET VOLUME"),
+            Request::SetPauseContext(scope, value) => {
+                send_one_line!(self, "SET {} PAUSE_CONTEXT {}", scope, value)
+            }
+            Request::SetHistory(scope, value) => {
+                send_toggle!(self, "SET {} HISTORY {}", scope, value)
+            }
+            Request::SetNotification(ntype, value) => {
+                send_toggle!(self, "SET self NOTIFICATION {} {}", ntype, value)
+            }
+            Request::Begin => send_one_line!(self, "BLOCK BEGIN"),
+            Request::End => send_one_line!(self, "BLOCK END"),
+            Request::Quit => send_one_line!(self, "QUIT"),
+        }?;
+        Ok(self)
     }
 
     /// Set the client name. It must be the first call on startup.
     pub fn set_client_name(&mut self, client_name: ClientName) -> ClientResult<&mut Self> {
-        send_lines(
-            &mut self.output,
-            &[format!(
-                "SET self CLIENT_NAME {}:{}:{}",
-                client_name.user, client_name.application, client_name.component
-            )
-            .as_str()],
-        )?;
-        Ok(self)
+        self.send(Request::SetName(client_name))
     }
 
     /// Initiate communitation to send text to speak
     pub fn speak(&mut self) -> ClientResult<&mut Self> {
-        send_lines(&mut self.output, &["SPEAK"])?;
-        Ok(self)
+        self.send(Request::Speak)
     }
 
-    /// Send lines
-    pub fn send_lines(&mut self, lines: &[&str]) -> ClientResult<&mut Self> {
-        const END_OF_DATA: [&str; 1] = ["."];
-        write_lines(&mut self.output, lines)?;
-        send_lines(&mut self.output, &END_OF_DATA)?;
-        Ok(self)
+    /// Speak a char
+    pub fn speak_char(&mut self, ch: char) -> ClientResult<&mut Self> {
+        self.send(Request::SpeakChar(ch))
     }
 
-    /// Send a line
-    pub fn send_line(&mut self, line: &str) -> ClientResult<&mut Self> {
-        const END_OF_DATA: &str = ".";
-        send_lines(&mut self.output, &[line, END_OF_DATA])?;
-        Ok(self)
-    }
-
-    /// Send a char
-    pub fn send_char(&mut self, ch: char) -> ClientResult<&mut Self> {
-        send_lines(&mut self.output, &[format!("CHAR {}", ch).as_str()])?;
-        Ok(self)
-    }
-
-    /// Send a symbolic key name
-    pub fn say_key_name(&mut self, keyname: KeyName) -> ClientResult<&mut Self> {
-        self.send_lines(&[format!("KEY {}", keyname).as_str()])
-    }
-
-    /// Action on a message or a group of messages
-    fn send_message_command(
-        &mut self,
-        command: &str,
-        scope: MessageScope,
-    ) -> ClientResult<&mut Self> {
-        let line = match scope {
-            MessageScope::Last => format!("{} self", command),
-            MessageScope::All => format!("{} all", command),
-            MessageScope::Message(id) => format!("{} {}", command, id),
-        };
-        send_lines(&mut self.output, &[line.as_str()])?;
-        Ok(self)
+    /// Speak a symbolic key name
+    pub fn speak_key(&mut self, key_name: KeyName) -> ClientResult<&mut Self> {
+        self.send(Request::SpeakKey(key_name))
     }
 
     /// Stop current message
     pub fn stop(&mut self, scope: MessageScope) -> ClientResult<&mut Self> {
-        self.send_message_command("STOP", scope)
+        self.send(Request::Stop(scope))
     }
 
     /// Cancel current message
     pub fn cancel(&mut self, scope: MessageScope) -> ClientResult<&mut Self> {
-        self.send_message_command("CANCEL", scope)
+        self.send(Request::Cancel(scope))
     }
 
     /// Pause current message
     pub fn pause(&mut self, scope: MessageScope) -> ClientResult<&mut Self> {
-        self.send_message_command("PAUSE", scope)
+        self.send(Request::Pause(scope))
     }
 
     /// Resume current message
     pub fn resume(&mut self, scope: MessageScope) -> ClientResult<&mut Self> {
-        self.send_message_command("RESUME", scope)
+        self.send(Request::Resume(scope))
     }
 
-    client_send!(
-        set_priority,
-        "Set message priority",
-        priority as Priority,
-        "SET self PRIORITY {}"
-    );
+    /// Set message priority
+    pub fn set_priority(&mut self, prio: Priority) -> ClientResult<&mut Self> {
+        self.send(Request::SetPriority(prio))
+    }
 
-    client_send_boolean!(
-        set_debug,
-        "Set debug mode. Return the log location",
-        value,
-        "SET all DEBUG {}"
-    );
+    /// Set debug mode. Return the log location
+    pub fn set_debug(&mut self, value: bool) -> ClientResult<&mut Self> {
+        self.send(Request::SetDebug(value))
+    }
 
-    client_send!(
-        set_output_module,
-        "Set output module",
-        scope,
-        value as &str,
-        "SET {} OUTPUT_MODULE {}"
-    );
+    /// Set output module
+    pub fn set_output_module(
+        &mut self,
+        scope: ClientScope,
+        value: &str,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::SetOutputModule(scope, value.to_string()))
+    }
 
-    client_send!(
-        get_output_module,
-        "Get the current output module",
-        "GET OUTPUT_MODULE"
-    );
+    /// Get the current output module
+    pub fn get_output_module(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::GetOutputModule)
+    }
 
-    client_send!(
-        list_output_modules,
-        "List the available output modules",
-        "LIST OUTPUT_MODULES"
-    );
+    /// List the available output modules
+    pub fn list_output_modules(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::ListOutputModules)
+    }
 
-    client_send!(
-        set_language,
-        "Set language code",
-        scope,
-        value as &str,
-        "SET {} LANGUAGE {}"
-    );
+    /// Set language code
+    pub fn set_language(&mut self, scope: ClientScope, value: &str) -> ClientResult<&mut Self> {
+        self.send(Request::SetLanguage(scope, value.to_string()))
+    }
 
-    client_send!(get_language, "Get the current language", "GET LANGUAGE");
+    /// Get the current language
+    pub fn get_language(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::GetLanguage)
+    }
 
-    client_send_boolean!(
-        set_ssml_mode,
-        "Set SSML mode (Speech Synthesis Markup Language)",
-        value,
-        "SET self SSML_MODE {}"
-    );
+    /// Set SSML mode (Speech Synthesis Markup Language)
+    pub fn set_ssml_mode(&mut self, mode: bool) -> ClientResult<&mut Self> {
+        self.send(Request::SetSsmlMode(mode))
+    }
 
-    client_send!(
-        set_punctuation_mode,
-        "Set punctuation mode",
-        scope,
-        value as PunctuationMode,
-        "SET {} PUNCTUATION {}"
-    );
+    /// Set punctuation mode
+    pub fn set_punctuation_mode(
+        &mut self,
+        scope: ClientScope,
+        mode: PunctuationMode,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::SetPunctuationMode(scope, mode))
+    }
 
-    client_send_boolean!(
-        set_spelling,
-        "Set spelling on or off",
-        scope,
-        value,
-        "SET {} SPELLING {}"
-    );
+    /// Set spelling on or off
+    pub fn set_spelling(&mut self, scope: ClientScope, value: bool) -> ClientResult<&mut Self> {
+        self.send(Request::SetSpelling(scope, value))
+    }
 
-    client_send!(
-        set_capital_letter_recogn,
-        "Set capital letters recognition mode",
-        scope,
-        value as CapitalLettersRecognitionMode,
-        "SET {} CAP_LET_RECOGN {}"
-    );
+    /// Set capital letters recognition mode
+    pub fn set_capital_letter_recogn(
+        &mut self,
+        scope: ClientScope,
+        mode: CapitalLettersRecognitionMode,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::SetCapitalLettersRecognitionMode(scope, mode))
+    }
 
-    client_send!(
-        set_voice_type,
-        "Set the voice type (MALE1, FEMALE1, …)",
-        scope,
-        value as &str,
-        "SET {} VOICE_TYPE {}"
-    );
+    /// Set the voice type (MALE1, FEMALE1, …)
+    pub fn set_voice_type(&mut self, scope: ClientScope, value: &str) -> ClientResult<&mut Self> {
+        self.send(Request::SetVoiceType(scope, value.to_string()))
+    }
 
-    client_send!(
-        get_voice_type,
-        "Get the current pre-defined voice",
-        "GET VOICE_TYPE"
-    );
+    /// Get the current pre-defined voice
+    pub fn get_voice_type(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::GetVoiceType)
+    }
 
-    client_send!(
-        list_voice_types,
-        "List the available symbolic voice names",
-        "LIST VOICES"
-    );
+    /// List the available symbolic voice names
+    pub fn list_voice_types(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::ListVoiceTypes)
+    }
 
-    client_send!(
-        set_synthesis_voice,
-        "Set the voice",
-        scope,
-        value as &str,
-        "SET {} SYNTHESIS_VOICE {}"
-    );
+    /// Set the voice
+    pub fn set_synthesis_voice(
+        &mut self,
+        scope: ClientScope,
+        value: &str,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::SetSynthesisVoice(scope, value.to_string()))
+    }
 
-    client_send!(
-        list_synthesis_voices,
-        "Lists the available voices for the current synthesizer",
-        "LIST SYNTHESIS_VOICES"
-    );
+    /// Lists the available voices for the current synthesizer
+    pub fn list_synthesis_voices(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::ListSynthesisVoices)
+    }
 
-    client_send_range!(
-        set_rate,
-        "Set the rate of speech. n is an integer value within the range from -100 to 100, lower values meaning slower speech.",
-        scope,
-        value,
-        "SET {} RATE {}"
-    );
+    /// Set the rate of speech. n is an integer value within the range from -100 to 100, lower values meaning slower speech.
+    pub fn set_rate(&mut self, scope: ClientScope, value: i8) -> ClientResult<&mut Self> {
+        self.send(Request::SetRate(scope, value))
+    }
 
-    client_send!(get_rate, "Get the current rate of speech.", "GET RATE");
+    /// Get the current rate of speech.
+    pub fn get_rate(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::GetRate)
+    }
 
-    client_send_range!(
-        set_pitch,
-        "Set the pitch of speech. n is an integer value within the range from -100 to 100.",
-        scope,
-        value,
-        "SET {} PITCH {}"
-    );
+    /// Set the pitch of speech. n is an integer value within the range from -100 to 100.
+    pub fn set_pitch(&mut self, scope: ClientScope, value: i8) -> ClientResult<&mut Self> {
+        self.send(Request::SetPitch(scope, value))
+    }
 
-    client_send!(get_pitch, "Get the current pitch value.", "GET PITCH");
+    /// Get the current pitch value.
+    pub fn get_pitch(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::GetPitch)
+    }
 
-    client_send_range!(
-        set_volume,
-        "Set the volume of speech. n is an integer value within the range from -100 to 100.",
-        scope,
-        value,
-        "SET {} VOLUME {}"
-    );
+    /// Set the volume of speech. n is an integer value within the range from -100 to 100.
+    pub fn set_volume(&mut self, scope: ClientScope, value: i8) -> ClientResult<&mut Self> {
+        self.send(Request::SetVolume(scope, value))
+    }
 
-    client_send!(get_volume, "Get the current volume.", "GET VOLUME");
+    /// Get the current volume.
+    pub fn get_volume(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::GetVolume)
+    }
 
-    client_send!(
-        set_pause_context,
-        "Set the number of (more or less) sentences that should be repeated after a previously paused text is resumed.",
-        scope,
-        value as u8,
-        "SET {} PAUSE_CONTEXT {}"
-    );
+    /// Set the number of (more or less) sentences that should be repeated after a previously paused text is resumed.
+    pub fn set_pause_context(&mut self, scope: ClientScope, value: u8) -> ClientResult<&mut Self> {
+        self.send(Request::SetPauseContext(scope, value))
+    }
 
-    client_send_boolean!(
-        set_history,
-        "Enable or disable history of received messages.",
-        scope,
-        value,
-        "SET {} HISTORY {}"
-    );
+    /// Enable or disable history of received messages.
+    pub fn set_history(&mut self, scope: ClientScope, value: bool) -> ClientResult<&mut Self> {
+        self.send(Request::SetHistory(scope, value))
+    }
 
-    client_send!(block_begin, "Open a block", "BLOCK BEGIN");
+    /// Enable notification events
+    pub fn set_notification(
+        &mut self,
+        ntype: NotificationType,
+        value: bool,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::SetNotification(ntype, value))
+    }
 
-    client_send!(block_end, "End a block", "BLOCK END");
+    /// Open a block
+    pub fn block_begin(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::Begin)
+    }
 
-    client_send!(quit, "Close the connection", "QUIT");
+    /// End a block
+    pub fn block_end(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::End)
+    }
 
-    client_send!(
-        enable_notification,
-        "Enable notification events",
-        value as NotificationType,
-        "SET self NOTIFICATION {} on"
-    );
-
-    client_send!(
-        disable_notification,
-        "Disable notification events",
-        value as NotificationType,
-        "SET self NOTIFICATION {} off"
-    );
+    /// Close the connection
+    pub fn quit(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::Quit)
+    }
 
     /// Receive answer from server
-    pub fn receive(&mut self, lines: &mut Vec<String>) -> ClientStatus {
+    fn receive_answer(&mut self, lines: &mut Vec<String>) -> ClientStatus {
         crate::protocol::receive_answer(&mut self.input, Some(lines))
+    }
+
+    /// Receive one response.
+    pub fn receive(&mut self) -> ClientResult<Response> {
+        const MSG_CURSOR_SET_FIRST: &str = "OK CURSOR SET FIRST";
+        let mut lines = Vec::new();
+        let status = self.receive_answer(&mut lines)?;
+        match status.code {
+            OK_LANGUAGE_SET => Ok(Response::LanguageSet),
+            OK_PRIORITY_SET => Ok(Response::PrioritySet),
+            OK_RATE_SET => Ok(Response::RateSet),
+            OK_PITCH_SET => Ok(Response::PitchSet),
+            OK_PUNCTUATION_SET => Ok(Response::PunctuationSet),
+            OK_CAP_LET_RECOGN_SET => Ok(Response::CapLetRecognSet),
+            OK_SPELLING_SET => Ok(Response::SpellingSet),
+            OK_CLIENT_NAME_SET => Ok(Response::ClientNameSet),
+            OK_VOICE_SET => Ok(Response::VoiceSet),
+            OK_STOPPED => Ok(Response::Stopped),
+            OK_PAUSED => Ok(Response::Paused),
+            OK_RESUMED => Ok(Response::Resumed),
+            OK_CANCELED => Ok(Response::Canceled),
+            OK_TABLE_SET => Ok(Response::TableSet),
+            OK_OUTPUT_MODULE_SET => Ok(Response::OutputModuleSet),
+            OK_PAUSE_CONTEXT_SET => Ok(Response::PauseContextSet),
+            OK_VOLUME_SET => Ok(Response::VolumeSet),
+            OK_SSML_MODE_SET => Ok(Response::SsmlModeSet),
+            // Warning OK_CUR_SET_FIRST == OK_NOTIFICATION_SET == 220. Matching message to make the difference
+            OK_NOTIFICATION_SET => {
+                if status.message == MSG_CURSOR_SET_FIRST {
+                    //OK_CUR_SET_FIRST => Ok(Response::HistoryCurSetFirst)
+                    Ok(Response::HistoryCurSetFirst)
+                } else {
+                    Ok(Response::NotificationSet)
+                }
+            }
+            OK_CUR_SET_LAST => Ok(Response::HistoryCurSetLast),
+            OK_CUR_SET_POS => Ok(Response::HistoryCurSetPos),
+            OK_PITCH_RANGE_SET => Ok(Response::PitchRangeSet),
+            OK_DEBUG_SET => Ok(Response::DebugSet),
+            OK_CUR_MOV_FOR => Ok(Response::HistoryCurMoveFor),
+            OK_CUR_MOV_BACK => Ok(Response::HistoryCurMoveBack),
+            OK_MESSAGE_QUEUED => Ok(Response::MessageQueued),
+            OK_SND_ICON_QUEUED => Ok(Response::SoundIconQueued),
+            OK_MSG_CANCELED => Ok(Response::MessageCanceled),
+            OK_RECEIVING_DATA => Ok(Response::ReceivingData),
+            OK_BYE => Ok(Response::Bye),
+            OK_CLIENT_LIST_SENT => Ok(Response::HistoryClientListSent(lines)),
+            OK_MSGS_LIST_SENT => Ok(Response::HistoryMsgsListSent(lines)),
+            OK_LAST_MSG => Ok(Response::HistoryLastMsg(parse_single_value(&lines)?)),
+            OK_CUR_POS_RET => Ok(Response::HistoryCurPosRet(parse_single_value(&lines)?)),
+            OK_TABLE_LIST_SENT => Ok(Response::TableListSent(lines)),
+            OK_CLIENT_ID_SENT => Ok(Response::HistoryClientIdSent(parse_single_value(&lines)?)),
+            OK_MSG_TEXT_SENT => Ok(Response::MessageTextSent),
+            OK_HELP_SENT => Ok(Response::HelpSent(lines)),
+            OK_VOICES_LIST_SENT => Ok(Response::VoicesListSent(parse_synthesis_voices(&lines)?)),
+            OK_OUTPUT_MODULES_LIST_SENT => Ok(Response::OutputModulesListSent(lines)),
+            OK_GET => Ok(Response::Get(parse_single_value(&lines)?)),
+            OK_INSIDE_BLOCK => Ok(Response::InsideBlock),
+            OK_OUTSIDE_BLOCK => Ok(Response::OutsideBlock),
+            OK_NOT_IMPLEMENTED => Ok(Response::NotImplemented),
+            EVENT_INDEX_MARK => match lines.len() {
+                0 | 1 | 2 => Err(ClientError::TooFewLines),
+                3 => Ok(Response::EventIndexMark(
+                    parse_event_id(&lines)?,
+                    lines[2].to_owned(),
+                )),
+                _ => Err(ClientError::TooManyLines),
+            },
+            EVENT_BEGIN => Ok(Response::EventBegin(parse_event_id(&lines)?)),
+            EVENT_END => Ok(Response::EventEnd(parse_event_id(&lines)?)),
+            EVENT_CANCELED => Ok(Response::EventCanceled(parse_event_id(&lines)?)),
+            EVENT_PAUSED => Ok(Response::EventPaused(parse_event_id(&lines)?)),
+            EVENT_RESUMED => Ok(Response::EventResumed(parse_event_id(&lines)?)),
+            _ => panic!("error should have been caught earlier"),
+        }
     }
 
     /// Check status of answer, discard lines.
@@ -474,7 +568,7 @@ impl<S: Read + Write + Source> Client<S> {
     /// Receive lines
     pub fn receive_lines(&mut self, expected_code: ReturnCode) -> ClientResult<Vec<String>> {
         let mut lines = Vec::new();
-        let status = self.receive(&mut lines)?;
+        let status = self.receive_answer(&mut lines)?;
         if status.code == expected_code {
             Ok(lines)
         } else {
@@ -485,7 +579,7 @@ impl<S: Read + Write + Source> Client<S> {
     /// Receive a single string
     pub fn receive_string(&mut self, expected_code: ReturnCode) -> ClientResult<String> {
         self.receive_lines(expected_code)
-            .and_then(|lines| Self::parse_single_value(&lines))
+            .and_then(|lines| parse_single_value(&lines))
     }
 
     /// Receive integer
@@ -503,7 +597,7 @@ impl<S: Read + Write + Source> Client<S> {
     /// Receive a list of synthesis voices
     pub fn receive_synthesis_voices(&mut self) -> ClientResult<Vec<SynthesisVoice>> {
         self.receive_lines(OK_VOICES_LIST_SENT)
-            .and_then(|lines| Self::parse_synthesis_voices(&lines))
+            .and_then(|lines| parse_synthesis_voices(&lines))
     }
 
     /// Receive a notification
@@ -558,28 +652,5 @@ impl<S: Read + Write + Source> Client<S> {
         poll.registry()
             .register(self.output.get_mut(), output_token, mio::Interest::WRITABLE)?;
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    #[cfg(not(feature = "async-mio"))]
-    use std::net::TcpStream;
-
-    #[cfg(feature = "async-mio")]
-    use mio::net::TcpStream;
-
-    use super::{Client, ClientError};
-
-    #[test]
-    fn parse_single_value() {
-        let result = Client::<TcpStream>::parse_single_value(&[String::from("one")]).unwrap();
-        assert_eq!("one", result);
-        let err_empty = Client::<TcpStream>::parse_single_value(&[]);
-        assert!(matches!(err_empty, Err(ClientError::TooFewLines)));
-        let err_too_many =
-            Client::<TcpStream>::parse_single_value(&[String::from("one"), String::from("two")]);
-        assert!(matches!(err_too_many, Err(ClientError::TooManyLines)));
     }
 }

@@ -8,7 +8,9 @@
 // modified, or distributed except according to those terms.
 
 use std::fmt;
+use std::io;
 use std::str::FromStr;
+use thiserror::Error as ThisError;
 
 use strum_macros::Display as StrumDisplay;
 
@@ -32,6 +34,16 @@ pub enum MessageScope {
     Message(MessageId),
 }
 
+impl fmt::Display for MessageScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MessageScope::Last => write!(f, "self"),
+            MessageScope::All => write!(f, "all"),
+            MessageScope::Message(id) => write!(f, "{}", id),
+        }
+    }
+}
+
 /// Client identifiers
 #[derive(Debug, Clone)]
 pub enum ClientScope {
@@ -41,6 +53,16 @@ pub enum ClientScope {
     All,
     /// Specific client
     Client(ClientId),
+}
+
+impl fmt::Display for ClientScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ClientScope::Current => write!(f, "self"),
+            ClientScope::All => write!(f, "all"),
+            ClientScope::Client(id) => write!(f, "{}", id),
+        }
+    }
 }
 
 /// Priority
@@ -347,7 +369,7 @@ impl SynthesisVoice {
 }
 
 impl FromStr for SynthesisVoice {
-    type Err = std::io::Error;
+    type Err = io::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut iter = s.split('\t');
@@ -377,13 +399,71 @@ impl fmt::Display for StatusLine {
         write!(f, "{} {}", self.code, self.message)
     }
 }
+/// Client error, either I/O error or SSIP error.
+#[derive(ThisError, Debug)]
+pub enum ClientError {
+    #[error("Invalid type")]
+    InvalidType,
+    #[error("I/O: {0}")]
+    Io(io::Error),
+    #[error("Not ready")]
+    NotReady,
+    #[error("SSIP: {0}")]
+    Ssip(StatusLine),
+    #[error("Too few lines")]
+    TooFewLines,
+    #[error("Too many lines")]
+    TooManyLines,
+    #[error("Truncated message")]
+    TruncatedMessage,
+    #[error("Unexpected status: {0}")]
+    UnexpectedStatus(ReturnCode),
+}
+
+impl From<io::Error> for ClientError {
+    fn from(err: io::Error) -> Self {
+        if err.kind() == io::ErrorKind::WouldBlock {
+            ClientError::NotReady
+        } else {
+            ClientError::Io(err)
+        }
+    }
+}
+
+/// Client result.
+pub type ClientResult<T> = Result<T, ClientError>;
+
+/// Client result consisting in a single status line
+pub type ClientStatus = ClientResult<StatusLine>;
+
+/// Client name
+#[derive(Debug, Clone)]
+pub struct ClientName {
+    pub user: String,
+    pub application: String,
+    pub component: String,
+}
+
+impl ClientName {
+    pub fn new(user: &str, application: &str) -> Self {
+        ClientName::with_component(user, application, "main")
+    }
+
+    pub fn with_component(user: &str, application: &str, component: &str) -> Self {
+        ClientName {
+            user: user.to_string(),
+            application: application.to_string(),
+            component: component.to_string(),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
 
     use std::str::FromStr;
 
-    use super::SynthesisVoice;
+    use super::{MessageScope, SynthesisVoice};
 
     #[test]
     fn parse_synthesis_voice() {
@@ -399,5 +479,15 @@ mod tests {
         assert_eq!("Esperanto", v2.name);
         assert_eq!("eo", v2.language.unwrap());
         assert!(matches!(v2.dialect, None));
+    }
+
+    #[test]
+    fn format_message_scope() {
+        assert_eq!("self", format!("{}", MessageScope::Last).as_str());
+        assert_eq!("all", format!("{}", MessageScope::All).as_str());
+        assert_eq!(
+            "123",
+            format!("{}", MessageScope::Message("123".to_string())).as_str()
+        );
     }
 }

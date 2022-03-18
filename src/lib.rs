@@ -38,7 +38,7 @@ pub mod fifo;
 #[cfg(any(not(feature = "async-mio"), doc))]
 pub use client::Client;
 
-pub use client::{ClientError, ClientName, ClientResult, ClientStatus};
+pub use client::{Request, Response};
 pub use constants::*;
 pub use types::*;
 
@@ -46,4 +46,4 @@ pub use types::*;
 mod async_mio;
 
 #[cfg(feature = "async-mio")]
-pub use async_mio::{AsyncClient, Request, Response};
+pub use async_mio::AsyncClient;

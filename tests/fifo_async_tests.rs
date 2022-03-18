@@ -21,24 +21,18 @@ mod server;
 use server::Server;
 
 #[cfg(feature = "async-mio")]
-enum Answer {
-    Str(&'static str),
-    Int(i8),
-}
-
-#[cfg(feature = "async-mio")]
 struct State<'a, 'b> {
     pub done: bool,
     pub countdown: usize,
     pub writable: bool,
     pub start_get: bool,
     pub iter_requests: Iter<'a, Request>,
-    pub iter_answers: Iter<'b, Answer>,
+    pub iter_answers: Iter<'b, &'static str>,
 }
 
 #[cfg(feature = "async-mio")]
 impl<'a, 'b> State<'a, 'b> {
-    fn new(iter_requests: Iter<'a, Request>, iter_answers: Iter<'b, Answer>) -> Self {
+    fn new(iter_requests: Iter<'a, Request>, iter_answers: Iter<'b, &'static str>) -> Self {
         State {
             done: false,
             countdown: 50,
@@ -65,24 +59,9 @@ impl<'a, 'b> State<'a, 'b> {
         }
     }
 
-    fn assert_string(&mut self, val: &str) {
+    fn assert_answer(&mut self, val: &str) {
         match self.iter_answers.next() {
-            Some(Answer::Str(expected_val)) => assert_eq!(expected_val, &val),
-            Some(Answer::Int(expected_val)) => panic!(
-                "expecting integer {} instead of string '{}'",
-                expected_val, val
-            ),
-            None => panic!("no more answers"),
-        }
-    }
-
-    fn assert_integer(&mut self, val: i8) {
-        match self.iter_answers.next() {
-            Some(Answer::Int(expected_val)) => assert_eq!(expected_val, &val),
-            Some(Answer::Str(expected_val)) => panic!(
-                "expecting string '{}' instead of integer {}",
-                expected_val, val
-            ),
+            Some(expected_val) => assert_eq!(expected_val, &val),
             None => panic!("no more answers"),
         }
     }
@@ -106,7 +85,7 @@ fn basic_async_communication() -> ClientResult<()> {
     ];
 
     let get_requests = vec![Request::GetOutputModule, Request::GetRate];
-    let get_answers = vec![Answer::Str("espeak"), Answer::Int(10)];
+    let get_answers = vec!["espeak", "10"];
     let mut state = State::new(get_requests.iter(), get_answers.iter());
 
     let socket_dir = tempfile::tempdir()?;
@@ -135,8 +114,7 @@ fn basic_async_communication() -> ClientResult<()> {
                     }
                     Response::LanguageSet => client.push(Request::Stop(MessageScope::Last)),
                     Response::Stopped => state.start_get = true,
-                    Response::GetString(val) => state.assert_string(&val),
-                    Response::GetInteger(val) => state.assert_integer(val),
+                    Response::Get(val) => state.assert_answer(&val),
                     result => panic!("Unexpected response: {:?}", result),
                 }
                 if let Some(request) = state.next_request() {
