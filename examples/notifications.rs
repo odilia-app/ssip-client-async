@@ -11,7 +11,7 @@ fn main() -> ClientResult<()> {
         .check_client_name_set()?;
     // Enabling notifications
     client
-        .enable_notification(NotificationType::All)?
+        .set_notification(NotificationType::All, true)?
         .check_status(OK_NOTIFICATION_SET)?;
     // Sending message
     let msg_id = client

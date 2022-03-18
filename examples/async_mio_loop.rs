@@ -59,7 +59,7 @@ fn main() -> ClientResult<()> {
                     1 => {
                         if let Some(ch) = text.chars().next() {
                             println!("sending char: {}", ch);
-                            ssip_client.push(Request::SendChar(ch))
+                            ssip_client.push(Request::SpeakChar(ch))
                         }
                     }
                     _ => {
