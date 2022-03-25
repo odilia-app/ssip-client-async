@@ -63,6 +63,16 @@ impl<S: Read + Write + Source> AsyncClient<S> {
         self.requests.push_back(request);
     }
 
+    /// Pop the last request in the queue.
+    pub fn pop(&mut self) -> Option<Request> {
+        self.requests.pop_back()
+    }
+
+    /// Last request in the queue.
+    pub fn last(&self) -> Option<&Request> {
+        self.requests.back()
+    }
+
     /// Return true if there is a pending request.
     pub fn has_next(&self) -> bool {
         !self.requests.is_empty()
