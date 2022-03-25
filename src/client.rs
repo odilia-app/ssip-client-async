@@ -16,8 +16,8 @@ use crate::protocol::{
 use crate::types::*;
 
 // Trick to have common implementation for std and mio streams..
-#[cfg(not(feature = "async-mio"))]
-pub(crate) use std::fmt::Debug as Source;
+#[cfg(all(not(feature = "async-mio"), unix))]
+pub(crate) use std::os::unix::io::AsRawFd as Source;
 
 #[cfg(feature = "async-mio")]
 pub(crate) use mio::event::Source;
@@ -177,6 +177,18 @@ impl<S: Read + Write + Source> Client<S> {
     pub(crate) fn new(input: io::BufReader<S>, output: io::BufWriter<S>) -> Self {
         // https://stackoverflow.com/questions/58467659/how-to-store-tcpstream-with-bufreader-and-bufwriter-in-a-data-structure
         Self { input, output }
+    }
+
+    #[cfg(all(not(feature = "async-mio"), unix))]
+    /// Input source for asynchronous API based on `poll`.
+    pub(crate) fn input_source(&self) -> &S {
+        self.input.get_ref()
+    }
+
+    #[cfg(all(not(feature = "async-mio"), unix))]
+    /// Output source for asynchronous API based on `poll`.
+    pub(crate) fn output_source(&self) -> &S {
+        self.output.get_ref()
     }
 
     /// Send lines of text (terminated by a single dot).

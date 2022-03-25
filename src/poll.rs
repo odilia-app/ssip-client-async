@@ -8,7 +8,7 @@
 // modified, or distributed except according to those terms.
 
 use std::collections::VecDeque;
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 
 use crate::{
     client::{Client, Request, Response, Source},
@@ -31,15 +31,18 @@ mod mio {
 
 const INITIAL_REQUEST_QUEUE_CAPACITY: usize = 4;
 
-/// Asynchronous client based on `mio`.
+/// Client with a queue of requests.
 ///
+/// The client can be used with crates like [popol](https://crates.io/crates/popol) or
+/// with [mio](https://crates.io/crates/mio) if feature `async-mio` is enabled.
 ///
-pub struct AsyncClient<S: Read + Write + Source> {
+/// When the output is ready, a next event can be sent.
+pub struct QueuedClient<S: Read + Write + Source> {
     client: Client<S>,
     requests: VecDeque<Request>,
 }
 
-impl<S: Read + Write + Source> AsyncClient<S> {
+impl<S: Read + Write + Source> QueuedClient<S> {
     /// New asynchronous client build on top of a synchronous client.
     pub fn new(client: Client<S>) -> Self {
         Self {
@@ -48,13 +51,26 @@ impl<S: Read + Write + Source> AsyncClient<S> {
         }
     }
 
+    #[cfg(all(not(feature = "async-mio"), unix))]
+    /// Input source.
+    pub fn input_source(&self) -> &S {
+        self.client.input_source()
+    }
+
+    #[cfg(all(not(feature = "async-mio"), unix))]
+    /// Output source.
+    pub fn output_source(&self) -> &S {
+        self.client.output_source()
+    }
+
+    #[cfg(any(feature = "async-mio", doc))]
     /// Register client
     pub fn register(
         &mut self,
         poll: &mio::Poll,
         input_token: mio::Token,
         output_token: mio::Token,
-    ) -> io::Result<()> {
+    ) -> std::io::Result<()> {
         self.client.register(poll, input_token, output_token)
     }
 
@@ -82,11 +98,13 @@ impl<S: Read + Write + Source> AsyncClient<S> {
     ///
     /// Instance of `mio::Poll` generates a writable event only once until the socket returns `WouldBlock`.
     /// This error is mapped to `ClientError::NotReady`.
-    pub fn send_next(&mut self) -> ClientResult<()> {
+    pub fn send_next(&mut self) -> ClientResult<bool> {
         if let Some(request) = self.requests.pop_front() {
             self.client.send(request)?;
+            Ok(true)
+        } else {
+            Ok(false)
         }
-        Ok(())
     }
 
     /// Receive one response.

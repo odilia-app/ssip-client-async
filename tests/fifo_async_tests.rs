@@ -94,7 +94,7 @@ fn basic_async_communication() -> ClientResult<()> {
     let handle = Server::run(&socket_path, &COMMUNICATION);
     let mut poll = Poll::new()?;
     let mut events = Events::with_capacity(128);
-    let mut client = AsyncClient::new(fifo::Builder::new().path(&socket_path).build()?);
+    let mut client = QueuedClient::new(fifo::Builder::new().path(&socket_path).build()?);
     let input_token = Token(0);
     let output_token = Token(1);
     let timeout = Duration::new(0, 500 * 1000 * 1000 /* 500 ms */);
@@ -128,9 +128,9 @@ fn basic_async_communication() -> ClientResult<()> {
         }
         if state.must_send() {
             match client.send_next() {
-                Ok(()) => (),
+                Ok(_) => (),
                 Err(ClientError::NotReady) => state.writable = false,
-                err => return err,
+                Err(err) => return Err(err),
             }
         }
     }

@@ -61,16 +61,22 @@ mod synchronous {
 
     use super::FifoPath;
 
+    enum FifoMode {
+        Blocking,
+        NonBlocking,
+        TimeOut(Duration),
+    }
+
     pub struct Builder {
         path: FifoPath,
-        read_timeout: Option<Duration>,
+        mode: FifoMode,
     }
 
     impl Builder {
         pub fn new() -> Self {
             Self {
                 path: FifoPath::new(),
-                read_timeout: None,
+                mode: FifoMode::Blocking,
             }
         }
 
@@ -83,13 +89,22 @@ mod synchronous {
         }
 
         pub fn timeout(&mut self, read_timeout: Duration) -> &mut Self {
-            self.read_timeout = Some(read_timeout);
+            self.mode = FifoMode::TimeOut(read_timeout);
+            self
+        }
+
+        pub fn nonblocking(&mut self) -> &mut Self {
+            self.mode = FifoMode::NonBlocking;
             self
         }
 
         pub fn build(&self) -> io::Result<Client<UnixStream>> {
             let input = UnixStream::connect(self.path.get()?)?;
-            input.set_read_timeout(self.read_timeout)?;
+            match self.mode {
+                FifoMode::Blocking => input.set_nonblocking(false)?,
+                FifoMode::NonBlocking => input.set_nonblocking(true)?,
+                FifoMode::TimeOut(timeout) => input.set_read_timeout(Some(timeout))?,
+            }
             let output = input.try_clone()?;
             Ok(Client::new(BufReader::new(input), BufWriter::new(output)))
         }
