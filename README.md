@@ -8,7 +8,10 @@ Rust SSIP Client
 
 Speech Dispatcher [SSIP client library](http://htmlpreview.github.io/?https://github.com/brailcom/speechd/blob/master/doc/ssip.html) in pure rust.
 
-The API is synchronous by default. An asynchronous API based on [Mio](https://github.com/tokio-rs/mio) is available with a feature.
+The API is synchronous by default.
+
+A non-blocking API can be used with a low-level polling mechanism based on `poll`, or
+with [mio](https://github.com/tokio-rs/mio).
 
 - [x] Unix socket.
 - [ ] TCP socket.
@@ -21,17 +24,17 @@ The API is synchronous by default. An asynchronous API based on [Mio](https://gi
 Getting Started
 ---------------
 
-To use the synchronous API, use:
+To use the synchronous API or an asynchronous API compatible with low-level crates based on `poll`, use:
 
 ```toml
 [dependencies]
-ssip-client = "0.4"
+ssip-client = "0.6"
 ```
 
 For the asynchronous API, use:
 ```toml
 [dependencies]
-ssip-client = { version = "0.4", features = ["async-mio"] }
+ssip-client = { version = "0.6", features = ["async-mio"] }
 ```
 
 Example
