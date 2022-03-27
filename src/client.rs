@@ -299,7 +299,7 @@ impl<S: Read + Write + Source> Client<S> {
             Request::Begin => send_one_line!(self, "BLOCK BEGIN"),
             Request::End => send_one_line!(self, "BLOCK END"),
             Request::HistoryGetClients => send_one_line!(self, "HISTORY GET CLIENT_LIST"),
-            Request::HistoryGetClientId => panic!("not implemented"),
+            Request::HistoryGetClientId => send_one_line!(self, "HISTORY GET CLIENT_ID"),
             Request::HistoryGetClientMsgs(_scope, _start, _number) => panic!("not implemented"),
             Request::HistoryGetLastMsgId => panic!("not implemented"),
             Request::HistoryGetMsg(_id) => panic!("not implemented"),
@@ -731,6 +731,14 @@ impl<S: Read + Write + Source> Client<S> {
         self.receive_string(OK_MESSAGE_QUEUED).and_then(|s| {
             s.parse()
                 .map_err(|_| ClientError::invalid_data("invalid message id"))
+        })
+    }
+
+    /// Receive client id
+    pub fn receive_client_id(&mut self) -> ClientResult<ClientId> {
+        self.receive_string(OK_CLIENT_ID_SENT).and_then(|s| {
+            s.parse()
+                .map_err(|_| ClientError::invalid_data("invalid client id"))
         })
     }
 

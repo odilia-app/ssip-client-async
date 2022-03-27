@@ -422,3 +422,12 @@ fn history_clients_list() -> ClientResult<()> {
         },
     )
 }
+
+test_getter!(
+    history_get_client_id,
+    receive_client_id,
+    (),
+    "HISTORY GET CLIENT_ID\r\n",
+    "245-123\r\n245 OK CLIENT ID SENT\r\n",
+    123
+);
