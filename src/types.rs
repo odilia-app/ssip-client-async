@@ -21,7 +21,7 @@ pub type ReturnCode = u16;
 pub type MessageId = u32;
 
 /// Client identifier
-pub type ClientId = String;
+pub type ClientId = u32;
 
 /// Message identifiers
 #[derive(Debug, Clone)]
@@ -522,12 +522,72 @@ impl fmt::Display for HistoryPosition {
     }
 }
 
+/// History client status
+#[derive(Debug, PartialEq)]
+pub struct HistoryClientStatus {
+    pub id: ClientId,
+    pub name: String,
+    pub connected: bool,
+}
+
+impl HistoryClientStatus {
+    pub fn new(id: ClientId, name: &str, connected: bool) -> Self {
+        Self {
+            id,
+            name: name.to_string(),
+            connected,
+        }
+    }
+
+    fn invalid_data(msg: &str) -> io::Error {
+        io::Error::new(io::ErrorKind::InvalidData, msg)
+    }
+
+    fn unexpected_eof(msg: &str) -> io::Error {
+        io::Error::new(io::ErrorKind::UnexpectedEof, msg)
+    }
+}
+
+impl FromStr for HistoryClientStatus {
+    type Err = io::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut iter = s.splitn(3, ' ');
+        match iter.next() {
+            Some("") => Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "expecting client id",
+            )),
+            Some(client_id) => match client_id.parse::<u32>() {
+                Ok(id) => match iter.next() {
+                    Some(name) => match iter.next() {
+                        Some(status) if status == "0" => {
+                            Ok(HistoryClientStatus::new(id, name, false))
+                        }
+                        Some(status) if status == "1" => {
+                            Ok(HistoryClientStatus::new(id, name, true))
+                        }
+                        Some(_) => Err(HistoryClientStatus::invalid_data("invalid client status")),
+                        None => Err(HistoryClientStatus::unexpected_eof(
+                            "expecting client status",
+                        )),
+                    },
+                    None => Err(HistoryClientStatus::unexpected_eof("expecting client name")),
+                },
+                Err(_) => Err(HistoryClientStatus::invalid_data("invalid client id")),
+            },
+            None => Err(HistoryClientStatus::unexpected_eof("expecting client id")),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
+    use std::io;
     use std::str::FromStr;
 
-    use super::{MessageScope, SynthesisVoice};
+    use super::{HistoryClientStatus, HistoryPosition, MessageScope, SynthesisVoice};
 
     #[test]
     fn parse_synthesis_voice() {
@@ -550,5 +610,49 @@ mod tests {
         assert_eq!("self", format!("{}", MessageScope::Last).as_str());
         assert_eq!("all", format!("{}", MessageScope::All).as_str());
         assert_eq!("123", format!("{}", MessageScope::Message(123)).as_str());
+    }
+
+    #[test]
+    fn format_history_position() {
+        assert_eq!("first", format!("{}", HistoryPosition::First).as_str());
+        assert_eq!("last", format!("{}", HistoryPosition::Last).as_str());
+        assert_eq!("pos 15", format!("{}", HistoryPosition::Pos(15)).as_str());
+    }
+
+    #[test]
+    fn parse_history_client_status() {
+        assert_eq!(
+            HistoryClientStatus::new(10, "joe:speechd_client:main", false),
+            HistoryClientStatus::from_str("10 joe:speechd_client:main 0").unwrap()
+        );
+        assert_eq!(
+            HistoryClientStatus::new(11, "joe:speechd_client:main", true),
+            HistoryClientStatus::from_str("11 joe:speechd_client:main 1").unwrap()
+        );
+        for line in &[
+            "9 joe:speechd_client:main xxx",
+            "xxx joe:speechd_client:main 1",
+        ] {
+            match HistoryClientStatus::from_str(line) {
+                Ok(_) => panic!("parsing should have failed"),
+                Err(err) => assert_eq!(
+                    io::ErrorKind::InvalidData,
+                    err.kind(),
+                    "expecting error 'invalid data' parsing \"{}\"",
+                    line
+                ),
+            }
+        }
+        for line in &["8 joe:speechd_client:main", "8", ""] {
+            match HistoryClientStatus::from_str(line) {
+                Ok(_) => panic!("parsing should have failed"),
+                Err(err) => assert_eq!(
+                    io::ErrorKind::UnexpectedEof,
+                    err.kind(),
+                    "expecting error 'unexpected EOF' parsing \"{}\"",
+                    line
+                ),
+            }
+        }
     }
 }

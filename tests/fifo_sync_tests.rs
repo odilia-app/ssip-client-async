@@ -396,3 +396,29 @@ fn receive_notification() -> ClientResult<()> {
         },
     )
 }
+
+#[test]
+#[cfg(not(feature = "async-mio"))]
+fn history_clients_list() -> ClientResult<()> {
+    test_client(
+        &[
+            SET_CLIENT_COMMUNICATION,
+            (
+                "HISTORY GET CLIENT_LIST\r\n",
+                "240-0 joe:speechd_client:main 0\r\n240-1 joe:speechd_client:status 0\r\n240-2 unknown:unknown:unknown 1\r\n240 OK CLIENTS LIST SENT\r\n"
+            ),
+        ],
+        |client| {
+            let statuses = client.history_get_clients().unwrap().receive_history_clients().unwrap();
+            let expected_statuses: [HistoryClientStatus; 3] = [ HistoryClientStatus::new(0, "joe:speechd_client:main", false),
+                                                                HistoryClientStatus::new(1, "joe:speechd_client:status", false),
+                                                                HistoryClientStatus::new(2, "unknown:unknown:unknown", true),
+            ];
+            assert_eq!(expected_statuses.len(), statuses.len());
+            for (expected, found) in expected_statuses.iter().zip(statuses.iter()) {
+                assert_eq!(*expected, *found);
+            }
+            Ok(())
+        },
+    )
+}

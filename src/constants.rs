@@ -97,7 +97,7 @@ pub const OK_RECEIVING_DATA: ReturnCode = 230;
 pub const OK_BYE: ReturnCode = 231;
 
 /// Successful completion: OK CLIENTS LIST SENT
-pub const OK_CLIENT_LIST_SENT: ReturnCode = 240;
+pub const OK_CLIENTS_LIST_SENT: ReturnCode = 240;
 
 /// Successful completion: OK MSGS LIST SENT
 pub const OK_MSGS_LIST_SENT: ReturnCode = 241;

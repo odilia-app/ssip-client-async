@@ -11,7 +11,7 @@ use log::debug;
 use std::io::{self, BufRead, Write};
 use std::str::FromStr;
 
-use crate::types::{ClientError, ClientResult, ClientStatus, EventId, StatusLine, SynthesisVoice};
+use crate::types::{ClientError, ClientResult, ClientStatus, EventId, StatusLine};
 
 macro_rules! invalid_input {
     ($msg:expr) => {
@@ -40,13 +40,14 @@ pub(crate) fn parse_event_id(lines: &[String]) -> ClientResult<EventId> {
     }
 }
 
-pub(crate) fn parse_synthesis_voices(lines: &[String]) -> ClientResult<Vec<SynthesisVoice>> {
-    let mut voices = Vec::new();
-    for name in lines.iter() {
-        let voice = SynthesisVoice::from_str(name.as_str())?;
-        voices.push(voice);
-    }
-    Ok(voices)
+pub(crate) fn parse_typed_lines<T>(lines: &[String]) -> ClientResult<Vec<T>>
+where
+    T: FromStr<Err = io::Error>,
+{
+    lines
+        .iter()
+        .map(|line| T::from_str(line.as_str()).map_err(|err| ClientError::from(err)))
+        .collect::<ClientResult<Vec<T>>>()
 }
 
 /// Write lines separated by CRLF.
@@ -119,6 +120,8 @@ mod tests {
     use std::io::BufReader;
 
     use super::{receive_answer, ClientError, ClientResult};
+
+    use crate::types::SynthesisVoice;
 
     #[test]
     fn single_ok_status_line() {
@@ -225,7 +228,7 @@ mod tests {
             .iter()
             .map(|s| s.to_string())
             .collect::<Vec<String>>();
-        let voices = super::parse_synthesis_voices(&lines)?;
+        let voices = super::parse_typed_lines::<SynthesisVoice>(&lines)?;
         assert_eq!(3, voices.len());
         assert_eq!("en", voices[0].name.as_str());
         assert_eq!(Some(String::from("af")), voices[1].language);

@@ -11,7 +11,7 @@ use std::io::{self, Read, Write};
 
 use crate::constants::*;
 use crate::protocol::{
-    flush_lines, parse_event_id, parse_single_value, parse_synthesis_voices, write_lines,
+    flush_lines, parse_event_id, parse_single_value, parse_typed_lines, write_lines,
 };
 use crate::types::*;
 
@@ -96,57 +96,57 @@ pub enum Request {
 #[derive(Debug)]
 /// Response from SSIP server.
 pub enum Response {
-    LanguageSet,                         // 201
-    PrioritySet,                         // 202
-    RateSet,                             // 203
-    PitchSet,                            // 204
-    PunctuationSet,                      // 205
-    CapLetRecognSet,                     // 206
-    SpellingSet,                         // 207
-    ClientNameSet,                       // 208
-    VoiceSet,                            // 209
-    Stopped,                             // 210
-    Paused,                              // 211
-    Resumed,                             // 212
-    Canceled,                            // 213
-    TableSet,                            // 215
-    OutputModuleSet,                     // 216
-    PauseContextSet,                     // 217
-    VolumeSet,                           // 218
-    SsmlModeSet,                         // 219
-    NotificationSet,                     // 220
-    PitchRangeSet,                       // 263
-    DebugSet,                            // 262
-    HistoryCurSetFirst,                  // 220
-    HistoryCurSetLast,                   // 221
-    HistoryCurSetPos,                    // 222
-    HistoryCurMoveFor,                   // 223
-    HistoryCurMoveBack,                  // 224
-    MessageQueued,                       // 225,
-    SoundIconQueued,                     // 226
-    MessageCanceled,                     // 227
-    ReceivingData,                       // 230
-    Bye,                                 // 231
-    HistoryClientListSent(Vec<String>),  // 240
-    HistoryMsgsListSent(Vec<String>),    // 241
-    HistoryLastMsg(String),              // 242
-    HistoryCurPosRet(String),            // 243
-    TableListSent(Vec<String>),          // 244
-    HistoryClientIdSent(String),         // 245
-    MessageTextSent,                     // 246
-    HelpSent(Vec<String>),               // 248
-    VoicesListSent(Vec<SynthesisVoice>), // 249
-    OutputModulesListSent(Vec<String>),  // 250
-    Get(String),                         // 251
-    InsideBlock,                         // 260
-    OutsideBlock,                        // 261
-    NotImplemented,                      // 299
-    EventIndexMark(EventId, String),     // 700
-    EventBegin(EventId),                 // 701
-    EventEnd(EventId),                   // 702
-    EventCanceled(EventId),              // 703
-    EventPaused(EventId),                // 704
-    EventResumed(EventId),               // 705
+    LanguageSet,                                     // 201
+    PrioritySet,                                     // 202
+    RateSet,                                         // 203
+    PitchSet,                                        // 204
+    PunctuationSet,                                  // 205
+    CapLetRecognSet,                                 // 206
+    SpellingSet,                                     // 207
+    ClientNameSet,                                   // 208
+    VoiceSet,                                        // 209
+    Stopped,                                         // 210
+    Paused,                                          // 211
+    Resumed,                                         // 212
+    Canceled,                                        // 213
+    TableSet,                                        // 215
+    OutputModuleSet,                                 // 216
+    PauseContextSet,                                 // 217
+    VolumeSet,                                       // 218
+    SsmlModeSet,                                     // 219
+    NotificationSet,                                 // 220
+    PitchRangeSet,                                   // 263
+    DebugSet,                                        // 262
+    HistoryCurSetFirst,                              // 220
+    HistoryCurSetLast,                               // 221
+    HistoryCurSetPos,                                // 222
+    HistoryCurMoveFor,                               // 223
+    HistoryCurMoveBack,                              // 224
+    MessageQueued,                                   // 225,
+    SoundIconQueued,                                 // 226
+    MessageCanceled,                                 // 227
+    ReceivingData,                                   // 230
+    Bye,                                             // 231
+    HistoryClientListSent(Vec<HistoryClientStatus>), // 240
+    HistoryMsgsListSent(Vec<String>),                // 241
+    HistoryLastMsg(String),                          // 242
+    HistoryCurPosRet(String),                        // 243
+    TableListSent(Vec<String>),                      // 244
+    HistoryClientIdSent(String),                     // 245
+    MessageTextSent,                                 // 246
+    HelpSent(Vec<String>),                           // 248
+    VoicesListSent(Vec<SynthesisVoice>),             // 249
+    OutputModulesListSent(Vec<String>),              // 250
+    Get(String),                                     // 251
+    InsideBlock,                                     // 260
+    OutsideBlock,                                    // 261
+    NotImplemented,                                  // 299
+    EventIndexMark(EventId, String),                 // 700
+    EventBegin(EventId),                             // 701
+    EventEnd(EventId),                               // 702
+    EventCanceled(EventId),                          // 703
+    EventPaused(EventId),                            // 704
+    EventResumed(EventId),                           // 705
 }
 
 macro_rules! send_one_line {
@@ -297,7 +297,7 @@ impl<S: Read + Write + Source> Client<S> {
             }
             Request::Begin => send_one_line!(self, "BLOCK BEGIN"),
             Request::End => send_one_line!(self, "BLOCK END"),
-            Request::HistoryGetClients => panic!("not implemented"),
+            Request::HistoryGetClients => send_one_line!(self, "HISTORY GET CLIENT_LIST"),
             Request::HistoryGetClientId => panic!("not implemented"),
             Request::HistoryGetClientMsgs(_scope, _start, _number) => panic!("not implemented"),
             Request::HistoryGetLastMsgId => panic!("not implemented"),
@@ -646,7 +646,9 @@ impl<S: Read + Write + Source> Client<S> {
             OK_MSG_CANCELED => Ok(Response::MessageCanceled),
             OK_RECEIVING_DATA => Ok(Response::ReceivingData),
             OK_BYE => Ok(Response::Bye),
-            OK_CLIENT_LIST_SENT => Ok(Response::HistoryClientListSent(lines)),
+            OK_CLIENTS_LIST_SENT => Ok(Response::HistoryClientListSent(parse_typed_lines::<
+                HistoryClientStatus,
+            >(&lines)?)),
             OK_MSGS_LIST_SENT => Ok(Response::HistoryMsgsListSent(lines)),
             OK_LAST_MSG => Ok(Response::HistoryLastMsg(parse_single_value(&lines)?)),
             OK_CUR_POS_RET => Ok(Response::HistoryCurPosRet(parse_single_value(&lines)?)),
@@ -654,7 +656,9 @@ impl<S: Read + Write + Source> Client<S> {
             OK_CLIENT_ID_SENT => Ok(Response::HistoryClientIdSent(parse_single_value(&lines)?)),
             OK_MSG_TEXT_SENT => Ok(Response::MessageTextSent),
             OK_HELP_SENT => Ok(Response::HelpSent(lines)),
-            OK_VOICES_LIST_SENT => Ok(Response::VoicesListSent(parse_synthesis_voices(&lines)?)),
+            OK_VOICES_LIST_SENT => Ok(Response::VoicesListSent(
+                parse_typed_lines::<SynthesisVoice>(&lines)?,
+            )),
             OK_OUTPUT_MODULES_LIST_SENT => Ok(Response::OutputModulesListSent(lines)),
             OK_GET => Ok(Response::Get(parse_single_value(&lines)?)),
             OK_INSIDE_BLOCK => Ok(Response::InsideBlock),
@@ -726,7 +730,7 @@ impl<S: Read + Write + Source> Client<S> {
     /// Receive a list of synthesis voices
     pub fn receive_synthesis_voices(&mut self) -> ClientResult<Vec<SynthesisVoice>> {
         self.receive_lines(OK_VOICES_LIST_SENT)
-            .and_then(|lines| parse_synthesis_voices(&lines))
+            .and_then(|lines| parse_typed_lines::<SynthesisVoice>(&lines))
     }
 
     /// Receive a notification
@@ -756,6 +760,12 @@ impl<S: Read + Write + Source> Client<S> {
                 }
             }
         })
+    }
+
+    /// Receive a list of client status from history.
+    pub fn receive_history_clients(&mut self) -> ClientResult<Vec<HistoryClientStatus>> {
+        self.receive_lines(OK_CLIENTS_LIST_SENT)
+            .and_then(|lines| parse_typed_lines::<HistoryClientStatus>(&lines))
     }
 
     /// Check the result of `set_client_name`.
