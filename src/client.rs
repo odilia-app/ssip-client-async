@@ -11,7 +11,8 @@ use std::io::{self, Read, Write};
 
 use crate::constants::*;
 use crate::protocol::{
-    flush_lines, parse_event_id, parse_single_value, parse_typed_lines, write_lines,
+    flush_lines, parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines,
+    write_lines,
 };
 use crate::types::*;
 
@@ -132,7 +133,7 @@ pub enum Response {
     HistoryLastMsg(String),                          // 242
     HistoryCurPosRet(String),                        // 243
     TableListSent(Vec<String>),                      // 244
-    HistoryClientIdSent(String),                     // 245
+    HistoryClientIdSent(ClientId),                   // 245
     MessageTextSent,                                 // 246
     HelpSent(Vec<String>),                           // 248
     VoicesListSent(Vec<SynthesisVoice>),             // 249
@@ -653,7 +654,7 @@ impl<S: Read + Write + Source> Client<S> {
             OK_LAST_MSG => Ok(Response::HistoryLastMsg(parse_single_value(&lines)?)),
             OK_CUR_POS_RET => Ok(Response::HistoryCurPosRet(parse_single_value(&lines)?)),
             OK_TABLE_LIST_SENT => Ok(Response::TableListSent(lines)),
-            OK_CLIENT_ID_SENT => Ok(Response::HistoryClientIdSent(parse_single_value(&lines)?)),
+            OK_CLIENT_ID_SENT => Ok(Response::HistoryClientIdSent(parse_single_integer(&lines)?)),
             OK_MSG_TEXT_SENT => Ok(Response::MessageTextSent),
             OK_HELP_SENT => Ok(Response::HelpSent(lines)),
             OK_VOICES_LIST_SENT => Ok(Response::VoicesListSent(
@@ -711,20 +712,26 @@ impl<S: Read + Write + Source> Client<S> {
 
     /// Receive signed 8-bit integer
     pub fn receive_i8(&mut self) -> ClientResult<u8> {
-        self.receive_string(OK_GET)
-            .and_then(|s| s.parse().map_err(|_| ClientError::InvalidType))
+        self.receive_string(OK_GET).and_then(|s| {
+            s.parse()
+                .map_err(|_| ClientError::invalid_data("invalid signed integer"))
+        })
     }
 
     /// Receive unsigned 8-bit integer
     pub fn receive_u8(&mut self) -> ClientResult<u8> {
-        self.receive_string(OK_GET)
-            .and_then(|s| s.parse().map_err(|_| ClientError::InvalidType))
+        self.receive_string(OK_GET).and_then(|s| {
+            s.parse()
+                .map_err(|_| ClientError::invalid_data("invalid unsigned integer"))
+        })
     }
 
     /// Receive message id
     pub fn receive_message_id(&mut self) -> ClientResult<MessageId> {
-        self.receive_string(OK_MESSAGE_QUEUED)
-            .and_then(|s| s.parse().map_err(|_| ClientError::InvalidType))
+        self.receive_string(OK_MESSAGE_QUEUED).and_then(|s| {
+            s.parse()
+                .map_err(|_| ClientError::invalid_data("invalid message id"))
+        })
     }
 
     /// Receive a list of synthesis voices
@@ -738,14 +745,14 @@ impl<S: Read + Write + Source> Client<S> {
         let mut lines = Vec::new();
         crate::protocol::receive_answer(&mut self.input, Some(&mut lines)).and_then(|status| {
             if lines.len() < 2 {
-                Err(ClientError::TruncatedMessage)
+                Err(ClientError::unexpected_eof("event truncated"))
             } else {
                 let message = &lines[0];
                 let client = &lines[1];
                 match status.code {
                     700 => {
                         if lines.len() != 3 {
-                            Err(ClientError::TruncatedMessage)
+                            Err(ClientError::unexpected_eof("index markevent truncated"))
                         } else {
                             let mark = lines[3].to_owned();
                             Ok(Event::index_mark(mark, message, client))
@@ -756,7 +763,7 @@ impl<S: Read + Write + Source> Client<S> {
                     703 => Ok(Event::cancel(message, client)),
                     704 => Ok(Event::pause(message, client)),
                     705 => Ok(Event::resume(message, client)),
-                    _ => Err(ClientError::InvalidType),
+                    _ => Err(ClientError::invalid_data("wrong status code for event")),
                 }
             }
         })

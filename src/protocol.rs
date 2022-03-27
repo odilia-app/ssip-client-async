@@ -40,13 +40,26 @@ pub(crate) fn parse_event_id(lines: &[String]) -> ClientResult<EventId> {
     }
 }
 
+/// Parse single integer value
+pub(crate) fn parse_single_integer<T>(lines: &[String]) -> ClientResult<T>
+where
+    T: FromStr,
+{
+    parse_single_value(lines)?.parse::<T>().map_err(|_| {
+        ClientError::Io(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "invalid integer value",
+        ))
+    })
+}
+
 pub(crate) fn parse_typed_lines<T>(lines: &[String]) -> ClientResult<Vec<T>>
 where
-    T: FromStr<Err = io::Error>,
+    T: FromStr<Err = ClientError>,
 {
     lines
         .iter()
-        .map(|line| T::from_str(line.as_str()).map_err(|err| ClientError::from(err)))
+        .map(|line| T::from_str(line.as_str()))
         .collect::<ClientResult<Vec<T>>>()
 }
 
