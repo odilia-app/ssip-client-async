@@ -458,6 +458,70 @@ impl ClientName {
     }
 }
 
+/// Cursor motion in history
+#[derive(StrumDisplay, Debug, Clone)]
+pub enum CursorDirection {
+    #[strum(serialize = "backward")]
+    Backward,
+    #[strum(serialize = "forward")]
+    Forward,
+}
+
+/// Sort direction in history
+#[derive(StrumDisplay, Debug, Clone)]
+pub enum SortDirection {
+    #[strum(serialize = "asc")]
+    Ascending,
+    #[strum(serialize = "desc")]
+    Descending,
+}
+
+/// Property messages are ordered by in history
+#[derive(StrumDisplay, Debug, Clone)]
+pub enum SortKey {
+    #[strum(serialize = "client_name")]
+    ClientName,
+    #[strum(serialize = "priority")]
+    Priority,
+    #[strum(serialize = "message_type")]
+    MessageType,
+    #[strum(serialize = "time")]
+    Time,
+    #[strum(serialize = "user")]
+    User,
+}
+
+/// Sort ordering
+#[derive(StrumDisplay, Debug, Clone)]
+pub enum Ordering {
+    #[strum(serialize = "text")]
+    Text,
+    #[strum(serialize = "sound_icon")]
+    SoundIcon,
+    #[strum(serialize = "char")]
+    Char,
+    #[strum(serialize = "key")]
+    Key,
+}
+
+/// Position in history
+#[derive(Debug, Clone)]
+pub enum HistoryPosition {
+    First,
+    Last,
+    Pos(u16),
+}
+
+impl fmt::Display for HistoryPosition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HistoryPosition::First => write!(f, "first"),
+            HistoryPosition::Last => write!(f, "last"),
+            HistoryPosition::Pos(n) => write!(f, "pos {}", n),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 

@@ -69,11 +69,26 @@ pub enum Request {
     GetPitch,
     SetVolume(ClientScope, i8),
     GetVolume,
-    SetPauseContext(ClientScope, u8),
+    SetPauseContext(ClientScope, u16),
     SetHistory(ClientScope, bool),
     SetNotification(NotificationType, bool),
+    // Blocks
     Begin,
     End,
+    // History
+    HistoryGetClients,
+    HistoryGetClientId,
+    HistoryGetClientMessages(ClientScope, u16, u16),
+    HistoryGetLastMessageId,
+    HistoryGetMessage(MessageId),
+    HistoryCursorGet,
+    HistoryCursorSet(ClientId, HistoryPosition),
+    HistoryCursorMove(CursorDirection),
+    HistorySort(SortDirection, SortKey),
+    HistorySetShortMessageLength(u16),
+    HistorySetMessageTypeOrdering(Ordering),
+    HistorySearch(MessageScope, String),
+    // Misc.
     Quit,
 }
 
@@ -281,6 +296,18 @@ impl<S: Read + Write + Source> Client<S> {
             }
             Request::Begin => send_one_line!(self, "BLOCK BEGIN"),
             Request::End => send_one_line!(self, "BLOCK END"),
+            Request::HistoryGetClients => panic!("not implemented"),
+            Request::HistoryGetClientId => panic!("not implemented"),
+            Request::HistoryGetClientMessages(_scope, _start, _number) => panic!("not implemented"),
+            Request::HistoryGetLastMessageId => panic!("not implemented"),
+            Request::HistoryGetMessage(_id) => panic!("not implemented"),
+            Request::HistoryCursorGet => panic!("not implemented"),
+            Request::HistoryCursorSet(_scope, _pos) => panic!("not implemented"),
+            Request::HistoryCursorMove(_direction) => panic!("not implemented"),
+            Request::HistorySort(_direction, _key) => panic!("not implemented"),
+            Request::HistorySetShortMessageLength(_length) => panic!("not implemented"),
+            Request::HistorySetMessageTypeOrdering(_ordering) => panic!("not implemented"),
+            Request::HistorySearch(_scope, _condition) => panic!("not implemented"),
             Request::Quit => send_one_line!(self, "QUIT"),
         }?;
         Ok(self)
@@ -453,7 +480,7 @@ impl<S: Read + Write + Source> Client<S> {
     }
 
     /// Set the number of (more or less) sentences that should be repeated after a previously paused text is resumed.
-    pub fn set_pause_context(&mut self, scope: ClientScope, value: u8) -> ClientResult<&mut Self> {
+    pub fn set_pause_context(&mut self, scope: ClientScope, value: u16) -> ClientResult<&mut Self> {
         self.send(Request::SetPauseContext(scope, value))
     }
 
@@ -594,7 +621,13 @@ impl<S: Read + Write + Source> Client<S> {
             .and_then(|lines| parse_single_value(&lines))
     }
 
-    /// Receive integer
+    /// Receive signed 8-bit integer
+    pub fn receive_i8(&mut self) -> ClientResult<u8> {
+        self.receive_string(OK_GET)
+            .and_then(|s| s.parse().map_err(|_| ClientError::InvalidType))
+    }
+
+    /// Receive unsigned 8-bit integer
     pub fn receive_u8(&mut self) -> ClientResult<u8> {
         self.receive_string(OK_GET)
             .and_then(|s| s.parse().map_err(|_| ClientError::InvalidType))

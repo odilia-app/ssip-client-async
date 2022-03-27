@@ -232,7 +232,7 @@ test_setter!(
 
 test_getter!(
     get_rate,
-    receive_u8,
+    receive_i8,
     (),
     "GET RATE\r\n",
     "251-0\r\n251 OK GET RETURNED\r\n",
@@ -250,7 +250,7 @@ test_setter!(
 
 test_getter!(
     get_volume,
-    receive_u8,
+    receive_i8,
     (),
     "GET VOLUME\r\n",
     "251-100\r\n251 OK GET RETURNED\r\n",
@@ -259,7 +259,7 @@ test_getter!(
 
 test_getter!(
     get_pitch,
-    receive_u8,
+    receive_i8,
     (),
     "GET PITCH\r\n",
     "251-0\r\n251 OK GET RETURNED\r\n",
