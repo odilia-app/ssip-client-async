@@ -81,7 +81,7 @@ fn say_one_line() -> ClientResult<()> {
         ],
         |client| {
             assert_eq!(
-                "21",
+                21,
                 client
                     .speak()
                     .unwrap()
@@ -374,7 +374,7 @@ fn receive_notification() -> ClientResult<()> {
         ],
         |client| {
             assert_eq!(
-                "21",
+                21,
                 client
                     .speak()
                     .unwrap()

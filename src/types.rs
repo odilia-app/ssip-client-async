@@ -18,7 +18,7 @@ use strum_macros::Display as StrumDisplay;
 pub type ReturnCode = u16;
 
 /// Message identifier
-pub type MessageId = String;
+pub type MessageId = u32;
 
 /// Client identifier
 pub type ClientId = String;
@@ -549,9 +549,6 @@ mod tests {
     fn format_message_scope() {
         assert_eq!("self", format!("{}", MessageScope::Last).as_str());
         assert_eq!("all", format!("{}", MessageScope::All).as_str());
-        assert_eq!(
-            "123",
-            format!("{}", MessageScope::Message("123".to_string())).as_str()
-        );
+        assert_eq!("123", format!("{}", MessageScope::Message(123)).as_str());
     }
 }

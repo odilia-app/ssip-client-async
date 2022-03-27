@@ -69,7 +69,7 @@ pub enum Request {
     GetPitch,
     SetVolume(ClientScope, i8),
     GetVolume,
-    SetPauseContext(ClientScope, u16),
+    SetPauseContext(ClientScope, u32),
     SetNotification(NotificationType, bool),
     // Blocks
     Begin,
@@ -305,6 +305,7 @@ impl<S: Read + Write + Source> Client<S> {
             Request::HistoryCursorGet => panic!("not implemented"),
             Request::HistoryCursorSet(_scope, _pos) => panic!("not implemented"),
             Request::HistoryCursorMove(_direction) => panic!("not implemented"),
+            Request::HistorySpeak(_id) => panic!("not implemented"),
             Request::HistorySort(_direction, _key) => panic!("not implemented"),
             Request::HistorySetShortMsgLength(_length) => panic!("not implemented"),
             Request::HistorySetMsgTypeOrdering(_ordering) => panic!("not implemented"),
