@@ -70,24 +70,25 @@ pub enum Request {
     SetVolume(ClientScope, i8),
     GetVolume,
     SetPauseContext(ClientScope, u16),
-    SetHistory(ClientScope, bool),
     SetNotification(NotificationType, bool),
     // Blocks
     Begin,
     End,
     // History
+    SetHistory(ClientScope, bool),
     HistoryGetClients,
     HistoryGetClientId,
-    HistoryGetClientMessages(ClientScope, u16, u16),
-    HistoryGetLastMessageId,
-    HistoryGetMessage(MessageId),
+    HistoryGetClientMsgs(ClientScope, u32, u32),
+    HistoryGetLastMsgId,
+    HistoryGetMsg(MessageId),
     HistoryCursorGet,
-    HistoryCursorSet(ClientId, HistoryPosition),
+    HistoryCursorSet(ClientScope, HistoryPosition),
     HistoryCursorMove(CursorDirection),
+    HistorySpeak(MessageId),
     HistorySort(SortDirection, SortKey),
-    HistorySetShortMessageLength(u16),
-    HistorySetMessageTypeOrdering(Ordering),
-    HistorySearch(MessageScope, String),
+    HistorySetShortMsgLength(u32),
+    HistorySetMsgTypeOrdering(Ordering),
+    HistorySearch(ClientScope, String),
     // Misc.
     Quit,
 }
@@ -298,15 +299,15 @@ impl<S: Read + Write + Source> Client<S> {
             Request::End => send_one_line!(self, "BLOCK END"),
             Request::HistoryGetClients => panic!("not implemented"),
             Request::HistoryGetClientId => panic!("not implemented"),
-            Request::HistoryGetClientMessages(_scope, _start, _number) => panic!("not implemented"),
-            Request::HistoryGetLastMessageId => panic!("not implemented"),
-            Request::HistoryGetMessage(_id) => panic!("not implemented"),
+            Request::HistoryGetClientMsgs(_scope, _start, _number) => panic!("not implemented"),
+            Request::HistoryGetLastMsgId => panic!("not implemented"),
+            Request::HistoryGetMsg(_id) => panic!("not implemented"),
             Request::HistoryCursorGet => panic!("not implemented"),
             Request::HistoryCursorSet(_scope, _pos) => panic!("not implemented"),
             Request::HistoryCursorMove(_direction) => panic!("not implemented"),
             Request::HistorySort(_direction, _key) => panic!("not implemented"),
-            Request::HistorySetShortMessageLength(_length) => panic!("not implemented"),
-            Request::HistorySetMessageTypeOrdering(_ordering) => panic!("not implemented"),
+            Request::HistorySetShortMsgLength(_length) => panic!("not implemented"),
+            Request::HistorySetMsgTypeOrdering(_ordering) => panic!("not implemented"),
             Request::HistorySearch(_scope, _condition) => panic!("not implemented"),
             Request::Quit => send_one_line!(self, "QUIT"),
         }?;
@@ -480,13 +481,8 @@ impl<S: Read + Write + Source> Client<S> {
     }
 
     /// Set the number of (more or less) sentences that should be repeated after a previously paused text is resumed.
-    pub fn set_pause_context(&mut self, scope: ClientScope, value: u16) -> ClientResult<&mut Self> {
+    pub fn set_pause_context(&mut self, scope: ClientScope, value: u32) -> ClientResult<&mut Self> {
         self.send(Request::SetPauseContext(scope, value))
-    }
-
-    /// Enable or disable history of received messages.
-    pub fn set_history(&mut self, scope: ClientScope, value: bool) -> ClientResult<&mut Self> {
-        self.send(Request::SetHistory(scope, value))
     }
 
     /// Enable notification events
@@ -506,6 +502,93 @@ impl<S: Read + Write + Source> Client<S> {
     /// End a block
     pub fn block_end(&mut self) -> ClientResult<&mut Self> {
         self.send(Request::End)
+    }
+
+    /// Enable or disable history of received messages.
+    pub fn set_history(&mut self, scope: ClientScope, value: bool) -> ClientResult<&mut Self> {
+        self.send(Request::SetHistory(scope, value))
+    }
+
+    /// Get clients in history.
+    pub fn history_get_clients(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryGetClients)
+    }
+
+    /// Get client id in the history.
+    pub fn history_get_client_id(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryGetClientId)
+    }
+
+    /// Get a range of client messages.
+    pub fn history_get_client_messages(
+        &mut self,
+        scope: ClientScope,
+        start: u32,
+        number: u32,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryGetClientMsgs(scope, start, number))
+    }
+
+    /// Get the id of the last message sent by the client.
+    pub fn history_get_last_message_id(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryGetLastMsgId)
+    }
+
+    /// Return the text of an history message.
+    pub fn history_get_message(&mut self, msg_id: MessageId) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryGetMsg(msg_id))
+    }
+
+    /// Get the id of the message the history cursor is pointing to.
+    pub fn history_get_cursor(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryCursorGet)
+    }
+
+    /// Set the history cursor position.
+    pub fn history_set_cursor(
+        &mut self,
+        scope: ClientScope,
+        pos: HistoryPosition,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryCursorSet(scope, pos))
+    }
+
+    /// Move the cursor position backward or forward.
+    pub fn history_move_cursor(&mut self, direction: CursorDirection) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryCursorMove(direction))
+    }
+
+    /// Speak the message from history.
+    pub fn history_speak(&mut self, msg_id: MessageId) -> ClientResult<&mut Self> {
+        self.send(Request::HistorySpeak(msg_id))
+    }
+
+    /// Sort messages in history.
+    pub fn history_sort(
+        &mut self,
+        direction: SortDirection,
+        key: SortKey,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::HistorySort(direction, key))
+    }
+
+    /// Set the maximum length of short versions of history messages.
+    pub fn history_set_short_message_length(&mut self, length: u32) -> ClientResult<&mut Self> {
+        self.send(Request::HistorySetShortMsgLength(length))
+    }
+
+    /// Set the ordering of the message types, from the minimum to the maximum.
+    pub fn history_set_ordering(&mut self, ordering: Ordering) -> ClientResult<&mut Self> {
+        self.send(Request::HistorySetMsgTypeOrdering(ordering))
+    }
+
+    /// Search in message history.
+    pub fn history_search(
+        &mut self,
+        scope: ClientScope,
+        condition: &str,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::HistorySearch(scope, condition.to_string()))
     }
 
     /// Close the connection

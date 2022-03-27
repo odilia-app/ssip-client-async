@@ -28,13 +28,13 @@ To use the synchronous API or an asynchronous API compatible with low-level crat
 
 ```toml
 [dependencies]
-ssip-client = "0.6"
+ssip-client = "0.7"
 ```
 
 For the asynchronous API, use:
 ```toml
 [dependencies]
-ssip-client = { version = "0.6", features = ["async-mio"] }
+ssip-client = { version = "0.7", features = ["async-mio"] }
 ```
 
 Example
