@@ -19,7 +19,7 @@ with [mio](https://github.com/tokio-rs/mio).
 - [x] List, set voices.
 - [x] Set rate, pitch, volume.
 - [x] Notifications.
-- [ ] Message history.
+- [x] Message history.
 
 Getting Started
 ---------------

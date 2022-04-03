@@ -114,19 +114,22 @@ macro_rules! test_setter {
 }
 
 macro_rules! test_getter {
-    ($getter:ident, $receive:ident, $arg:tt, $question:expr, $answer:expr, $value:expr) => {
+    ($getter:ident, $get_args:tt, $receive:ident, $recv_arg:tt, $question:expr, $answer:expr, $value:expr) => {
         #[test]
         #[cfg(not(feature = "async-mio"))]
         fn $getter() -> ClientResult<()> {
             test_client(
                 &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
                 |client| {
-                    let value = client.$getter().unwrap().$receive $arg.unwrap();
+                    let value = client.$getter $get_args.unwrap().$receive $recv_arg.unwrap();
                     assert_eq!($value, value);
                     Ok(())
                 },
             )
         }
+    };
+    ($getter:ident, $receive:ident, $arg:tt, $question:expr, $answer:expr, $value:expr) => {
+        test_getter!($getter, (), $receive, $arg, $question, $answer, $value);
     };
     ($getter:ident, $question:expr, $answer:expr, $value:expr) => {
         test_getter!($getter, receive_string, (OK_GET), $question, $answer, $value);
@@ -430,4 +433,32 @@ test_getter!(
     "HISTORY GET CLIENT_ID\r\n",
     "245-123\r\n245 OK CLIENT ID SENT\r\n",
     123
+);
+
+test_getter!(
+    history_get_last,
+    receive_message_id,
+    (),
+    "HISTORY GET LAST\r\n",
+    "242-123\r\n242 OK LAST MSG SAID\r\n",
+    123
+);
+
+test_getter!(
+    history_get_message,
+    (123),
+    receive_string,
+    (OK_MSG_TEXT_SENT),
+    "HISTORY GET MESSAGE 123\r\n",
+    "246-Hello, world!\r\n246 OK MESSAGE SENT\r\n",
+    "Hello, world!"
+);
+
+test_getter!(
+    history_get_cursor,
+    receive_cursor_pos,
+    (),
+    "HISTORY CURSOR GET",
+    "243-42\r\n243 OK CURSOR POSITION RETURNED\r\n",
+    42
 );

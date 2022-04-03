@@ -88,7 +88,7 @@ pub enum Request {
     HistorySpeak(MessageId),
     HistorySort(SortDirection, SortKey),
     HistorySetShortMsgLength(u32),
-    HistorySetMsgTypeOrdering(Ordering),
+    HistorySetMsgTypeOrdering(Vec<Ordering>),
     HistorySearch(ClientScope, String),
     // Misc.
     Quit,
@@ -300,17 +300,43 @@ impl<S: Read + Write + Source> Client<S> {
             Request::End => send_one_line!(self, "BLOCK END"),
             Request::HistoryGetClients => send_one_line!(self, "HISTORY GET CLIENT_LIST"),
             Request::HistoryGetClientId => send_one_line!(self, "HISTORY GET CLIENT_ID"),
-            Request::HistoryGetClientMsgs(_scope, _start, _number) => panic!("not implemented"),
-            Request::HistoryGetLastMsgId => panic!("not implemented"),
-            Request::HistoryGetMsg(_id) => panic!("not implemented"),
-            Request::HistoryCursorGet => panic!("not implemented"),
-            Request::HistoryCursorSet(_scope, _pos) => panic!("not implemented"),
-            Request::HistoryCursorMove(_direction) => panic!("not implemented"),
-            Request::HistorySpeak(_id) => panic!("not implemented"),
-            Request::HistorySort(_direction, _key) => panic!("not implemented"),
-            Request::HistorySetShortMsgLength(_length) => panic!("not implemented"),
-            Request::HistorySetMsgTypeOrdering(_ordering) => panic!("not implemented"),
-            Request::HistorySearch(_scope, _condition) => panic!("not implemented"),
+            Request::HistoryGetClientMsgs(scope, start, number) => send_one_line!(
+                self,
+                "HISTORY GET CLIENT_MESSAGES {} {}_{}",
+                scope,
+                start,
+                number
+            ),
+            Request::HistoryGetLastMsgId => send_one_line!(self, "HISTORY GET LAST"),
+            Request::HistoryGetMsg(id) => send_one_line!(self, "HISTORY GET MESSAGE {}", id),
+            Request::HistoryCursorGet => send_one_line!(self, "HISTORY CURSOR GET"),
+            Request::HistoryCursorSet(scope, pos) => {
+                send_one_line!(self, "HISTORY CURSOR SET {} {}", scope, pos)
+            }
+            Request::HistoryCursorMove(direction) => {
+                send_one_line!(self, "HISTORY CURSOR {}", direction)
+            }
+            Request::HistorySpeak(id) => send_one_line!(self, "HISTORY SAY {}", id),
+            Request::HistorySort(direction, key) => {
+                send_one_line!(self, "HISTORY SORT {} {}", direction, key)
+            }
+            Request::HistorySetShortMsgLength(length) => {
+                send_one_line!(self, "HISTORY SET SHORT_MESSAGE_LENGTH {}", length)
+            }
+            Request::HistorySetMsgTypeOrdering(ordering) => {
+                send_one_line!(
+                    self,
+                    "HISTORY SET MESSAGE_TYPE_ORDERING \"{}\"",
+                    ordering
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(" ")
+                )
+            }
+            Request::HistorySearch(scope, condition) => {
+                send_one_line!(self, "HISTORY SEARCH {} \"{}\"", scope, condition)
+            }
             Request::Quit => send_one_line!(self, "QUIT"),
         }?;
         Ok(self)
@@ -521,6 +547,11 @@ impl<S: Read + Write + Source> Client<S> {
         self.send(Request::HistoryGetClientId)
     }
 
+    /// Get last message said.
+    pub fn history_get_last(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryGetLastMsgId)
+    }
+
     /// Get a range of client messages.
     pub fn history_get_client_messages(
         &mut self,
@@ -580,7 +611,7 @@ impl<S: Read + Write + Source> Client<S> {
     }
 
     /// Set the ordering of the message types, from the minimum to the maximum.
-    pub fn history_set_ordering(&mut self, ordering: Ordering) -> ClientResult<&mut Self> {
+    pub fn history_set_ordering(&mut self, ordering: Vec<Ordering>) -> ClientResult<&mut Self> {
         self.send(Request::HistorySetMsgTypeOrdering(ordering))
     }
 
@@ -722,16 +753,25 @@ impl<S: Read + Write + Source> Client<S> {
     pub fn receive_u8(&mut self) -> ClientResult<u8> {
         self.receive_string(OK_GET).and_then(|s| {
             s.parse()
-                .map_err(|_| ClientError::invalid_data("invalid unsigned integer"))
+                .map_err(|_| ClientError::invalid_data("invalid unsigned 8-bit integer"))
+        })
+    }
+
+    /// Receive cursor pos
+    pub fn receive_cursor_pos(&mut self) -> ClientResult<u16> {
+        self.receive_string(OK_CUR_POS_RET).and_then(|s| {
+            s.parse()
+                .map_err(|_| ClientError::invalid_data("invalid unsigned 16-bit integer"))
         })
     }
 
     /// Receive message id
     pub fn receive_message_id(&mut self) -> ClientResult<MessageId> {
-        self.receive_string(OK_MESSAGE_QUEUED).and_then(|s| {
-            s.parse()
-                .map_err(|_| ClientError::invalid_data("invalid message id"))
-        })
+        let mut lines = Vec::new();
+        match self.receive_answer(&mut lines)?.code {
+            OK_MESSAGE_QUEUED | OK_LAST_MSG => Ok(parse_single_integer(&lines)?),
+            _ => Err(ClientError::invalid_data("not a message id")),
+        }
     }
 
     /// Receive client id
