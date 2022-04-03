@@ -31,11 +31,10 @@ where
     let socket_dir = tempfile::tempdir()?;
     let socket_path = socket_dir.path().join("test_client.socket");
     assert!(!socket_path.exists());
-    let server_path = socket_path.clone();
     let mut process_wrapper = std::panic::AssertUnwindSafe(process);
-    let handle = Server::run(&server_path, communication);
+    let handle = Server::run(&socket_path, communication);
     let mut client = ssip_client::fifo::Builder::new()
-        .path(&server_path)
+        .path(&socket_path)
         .build()?;
     client
         .set_client_name(ClientName::new("test", "test"))?
