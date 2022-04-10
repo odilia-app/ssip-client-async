@@ -12,6 +12,11 @@ use std::thread;
 
 use std::os::unix::net::UnixListener;
 
+/// Server traits
+pub trait Server {
+    fn serve(&mut self) -> io::Result<()>;
+}
+
 /// Server on a named socket.
 pub struct UnixServer {
     listener: UnixListener,
@@ -44,8 +49,10 @@ impl UnixServer {
             .map(|s| format!("{}\r\n", s))
             .collect::<Vec<String>>()
     }
+}
 
-    pub fn serve(&mut self) -> io::Result<()> {
+impl Server for UnixServer {
+    fn serve(&mut self) -> io::Result<()> {
         let (stream, _) = self.listener.accept()?;
         let mut input = BufReader::new(stream.try_clone()?);
         let mut output = BufWriter::new(stream);
@@ -65,21 +72,27 @@ impl UnixServer {
         }
         Ok(())
     }
+}
 
-    pub fn run<P>(
-        socket_path: P,
-        communication: &'static [(&'static str, &'static str)],
-    ) -> thread::JoinHandle<io::Result<()>>
-    where
-        P: AsRef<Path>,
-    {
-        let server_path = socket_path.as_ref().to_path_buf();
-        let mut server = Self::new(&server_path, communication).unwrap();
-        thread::spawn(move || -> io::Result<()> {
-            server.serve()?;
-            Ok(())
-        })
-    }
+/// Run the server in a thread
+pub fn run_server(mut server: Box<dyn Server + Send>) -> thread::JoinHandle<io::Result<()>> {
+    thread::spawn(move || -> io::Result<()> {
+        server.serve()?;
+        Ok(())
+    })
+}
+
+pub fn run_unix<P>(
+    socket_path: P,
+    communication: &'static [(&'static str, &'static str)],
+) -> io::Result<thread::JoinHandle<io::Result<()>>>
+where
+    P: AsRef<Path>,
+{
+    Ok(run_server(Box::new(UnixServer::new(
+        &socket_path,
+        communication,
+    )?)))
 }
 
 #[cfg(test)]

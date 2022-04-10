@@ -18,9 +18,6 @@ use ssip_client::*;
 mod server;
 
 #[cfg(feature = "async-mio")]
-use server::UnixServer;
-
-#[cfg(feature = "async-mio")]
 struct State<'a, 'b> {
     pub done: bool,
     pub countdown: usize,
@@ -91,7 +88,7 @@ fn basic_async_communication() -> ClientResult<()> {
     let socket_dir = tempfile::tempdir()?;
     let socket_path = socket_dir.path().join("basic_async_communication.socket");
     assert!(!socket_path.exists());
-    let handle = UnixServer::run(&socket_path, &COMMUNICATION);
+    let handle = server::run_unix(&socket_path, &COMMUNICATION)?;
     let mut poll = Poll::new()?;
     let mut events = Events::with_capacity(128);
     let mut client = QueuedClient::new(fifo::Builder::new().path(&socket_path).build()?);

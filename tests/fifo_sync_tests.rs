@@ -14,14 +14,11 @@ use std::{io, os::unix::net::UnixStream};
 #[cfg(not(feature = "async-mio"))]
 mod server;
 
-#[cfg(not(feature = "async-mio"))]
-use server::UnixServer;
-
 /// Create a server and run the client
 ///
 /// The communication is an array of (["question", ...], "response")
 #[cfg(not(feature = "async-mio"))]
-fn test_client<F>(
+fn test_unix_client<F>(
     communication: &'static [(&'static str, &'static str)],
     process: F,
 ) -> ClientResult<()>
@@ -32,7 +29,7 @@ where
     let socket_path = socket_dir.path().join("test_client.socket");
     assert!(!socket_path.exists());
     let mut process_wrapper = std::panic::AssertUnwindSafe(process);
-    let handle = UnixServer::run(&socket_path, communication);
+    let handle = server::run_unix(&socket_path, communication)?;
     let mut client = ssip_client::fifo::Builder::new()
         .path(&socket_path)
         .build()?;
@@ -54,7 +51,7 @@ const SET_CLIENT_COMMUNICATION: (&str, &str) = (
 #[test]
 #[cfg(not(feature = "async-mio"))]
 fn connect_and_quit() -> ClientResult<()> {
-    test_client(
+    test_unix_client(
         &[
             SET_CLIENT_COMMUNICATION,
             ("QUIT\r\n", "231 HAPPY HACKING\r\n"),
@@ -69,7 +66,7 @@ fn connect_and_quit() -> ClientResult<()> {
 #[test]
 #[cfg(not(feature = "async-mio"))]
 fn say_one_line() -> ClientResult<()> {
-    test_client(
+    test_unix_client(
         &[
             SET_CLIENT_COMMUNICATION,
             ("SPEAK\r\n", "230 OK RECEIVING DATA\r\n"),
@@ -101,7 +98,7 @@ macro_rules! test_setter {
         #[test]
         #[cfg(not(feature = "async-mio"))]
         fn $setter() -> ClientResult<()> {
-            test_client(
+            test_unix_client(
                 &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
                 |client| {
                     client.$setter($($arg)*).unwrap().check_status($code).unwrap();
@@ -117,7 +114,7 @@ macro_rules! test_getter {
         #[test]
         #[cfg(not(feature = "async-mio"))]
         fn $getter() -> ClientResult<()> {
-            test_client(
+            test_unix_client(
                 &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
                 |client| {
                     let value = client.$getter $get_args.unwrap().$receive $recv_arg.unwrap();
@@ -140,7 +137,7 @@ macro_rules! test_list {
         #[test]
         #[cfg(not(feature = "async-mio"))]
         fn $getter() -> ClientResult<()> {
-            test_client(
+            test_unix_client(
                 &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
                 |client| {
                     let values = client.$getter().unwrap().receive_lines($code).unwrap();
@@ -163,7 +160,7 @@ test_setter!(
 #[test]
 #[cfg(not(feature = "async-mio"))]
 fn set_debug() -> ClientResult<()> {
-    test_client(
+    test_unix_client(
         &[
             SET_CLIENT_COMMUNICATION,
             (
@@ -339,7 +336,7 @@ test_list!(
 #[test]
 #[cfg(not(feature = "async-mio"))]
 fn list_synthesis_voices() -> ClientResult<()> {
-    test_client(
+    test_unix_client(
         &[
             SET_CLIENT_COMMUNICATION,
             (
@@ -365,7 +362,7 @@ fn list_synthesis_voices() -> ClientResult<()> {
 #[test]
 #[cfg(not(feature = "async-mio"))]
 fn receive_notification() -> ClientResult<()> {
-    test_client(
+    test_unix_client(
         &[
             SET_CLIENT_COMMUNICATION,
             ("SPEAK\r\n", "230 OK RECEIVING DATA\r\n"),
@@ -402,7 +399,7 @@ fn receive_notification() -> ClientResult<()> {
 #[test]
 #[cfg(not(feature = "async-mio"))]
 fn history_clients_list() -> ClientResult<()> {
-    test_client(
+    test_unix_client(
         &[
             SET_CLIENT_COMMUNICATION,
             (
