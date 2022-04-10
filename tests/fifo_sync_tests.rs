@@ -15,7 +15,7 @@ use std::{io, os::unix::net::UnixStream};
 mod server;
 
 #[cfg(not(feature = "async-mio"))]
-use server::Server;
+use server::UnixServer;
 
 /// Create a server and run the client
 ///
@@ -32,7 +32,7 @@ where
     let socket_path = socket_dir.path().join("test_client.socket");
     assert!(!socket_path.exists());
     let mut process_wrapper = std::panic::AssertUnwindSafe(process);
-    let handle = Server::run(&socket_path, communication);
+    let handle = UnixServer::run(&socket_path, communication);
     let mut client = ssip_client::fifo::Builder::new()
         .path(&socket_path)
         .build()?;

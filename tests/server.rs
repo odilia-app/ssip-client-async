@@ -13,12 +13,12 @@ use std::thread;
 use std::os::unix::net::UnixListener;
 
 /// Server on a named socket.
-pub struct Server {
+pub struct UnixServer {
     listener: UnixListener,
     communication: Vec<(&'static str, &'static str)>,
 }
 
-impl Server {
+impl UnixServer {
     /// Create a new server on a named socket.
     ///
     /// Argument `communication` is an array of pairs. The first item is a list of strings
@@ -31,7 +31,7 @@ impl Server {
         P: AsRef<Path>,
     {
         let listener = UnixListener::bind(socket_path.as_ref())?;
-        Ok(Server {
+        Ok(Self {
             listener,
             communication: communication.to_vec(),
         })
@@ -50,7 +50,7 @@ impl Server {
         let mut input = BufReader::new(stream.try_clone()?);
         let mut output = BufWriter::new(stream);
         for (questions, answer) in self.communication.iter() {
-            for question in Server::split_lines(questions).iter() {
+            for question in Self::split_lines(questions).iter() {
                 let mut line = String::new();
                 input.read_line(&mut line)?;
                 if line != *question {
@@ -74,7 +74,7 @@ impl Server {
         P: AsRef<Path>,
     {
         let server_path = socket_path.as_ref().to_path_buf();
-        let mut server = Server::new(&server_path, communication).unwrap();
+        let mut server = Self::new(&server_path, communication).unwrap();
         thread::spawn(move || -> io::Result<()> {
             server.serve()?;
             Ok(())
@@ -85,12 +85,12 @@ impl Server {
 #[cfg(test)]
 mod test {
 
-    use super::Server;
+    use super::UnixServer;
 
     #[test]
     fn test_split_lines() {
         const ONE_LINE: &str = "one line\r\n";
-        let one_line = Server::split_lines(ONE_LINE);
+        let one_line = UnixServer::split_lines(ONE_LINE);
         assert_eq!(&[ONE_LINE], one_line.as_slice());
     }
 }
