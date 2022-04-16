@@ -1,5 +1,5 @@
 // ssip-client -- Speech Dispatcher client in Rust
-// Copyright (c) 2021 Laurent Pelecq
+// Copyright (c) 2021-2022 Laurent Pelecq
 //
 // Licensed under the Apache License, Version 2.0
 // <LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
@@ -58,25 +58,20 @@ mod synchronous {
     use std::time::Duration;
 
     use crate::client::Client;
+    use crate::net::StreamMode;
 
     use super::FifoPath;
 
-    enum FifoMode {
-        Blocking,
-        NonBlocking,
-        TimeOut(Duration),
-    }
-
     pub struct Builder {
         path: FifoPath,
-        mode: FifoMode,
+        mode: StreamMode,
     }
 
     impl Builder {
         pub fn new() -> Self {
             Self {
                 path: FifoPath::new(),
-                mode: FifoMode::Blocking,
+                mode: StreamMode::Blocking,
             }
         }
 
@@ -89,21 +84,21 @@ mod synchronous {
         }
 
         pub fn timeout(&mut self, read_timeout: Duration) -> &mut Self {
-            self.mode = FifoMode::TimeOut(read_timeout);
+            self.mode = StreamMode::TimeOut(read_timeout);
             self
         }
 
         pub fn nonblocking(&mut self) -> &mut Self {
-            self.mode = FifoMode::NonBlocking;
+            self.mode = StreamMode::NonBlocking;
             self
         }
 
         pub fn build(&self) -> io::Result<Client<UnixStream>> {
             let input = UnixStream::connect(self.path.get()?)?;
             match self.mode {
-                FifoMode::Blocking => input.set_nonblocking(false)?,
-                FifoMode::NonBlocking => input.set_nonblocking(true)?,
-                FifoMode::TimeOut(timeout) => input.set_read_timeout(Some(timeout))?,
+                StreamMode::Blocking => input.set_nonblocking(false)?,
+                StreamMode::NonBlocking => input.set_nonblocking(true)?,
+                StreamMode::TimeOut(timeout) => input.set_read_timeout(Some(timeout))?,
             }
             let output = input.try_clone()?;
             Ok(Client::new(BufReader::new(input), BufWriter::new(output)))

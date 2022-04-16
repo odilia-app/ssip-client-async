@@ -14,7 +14,7 @@ A non-blocking API can be used with a low-level polling mechanism based on `poll
 with [mio](https://github.com/tokio-rs/mio).
 
 - [x] Unix socket.
-- [ ] TCP socket.
+- [x] TCP socket.
 - [x] Stop, cancel, pause and resume.
 - [x] List, set voices.
 - [x] Set rate, pitch, volume.
@@ -28,13 +28,13 @@ To use the synchronous API or an asynchronous API compatible with low-level crat
 
 ```toml
 [dependencies]
-ssip-client = "0.7"
+ssip-client = "0.8"
 ```
 
 For the asynchronous API, use:
 ```toml
 [dependencies]
-ssip-client = { version = "0.7", features = ["async-mio"] }
+ssip-client = { version = "0.8", features = ["async-mio"] }
 ```
 
 Example

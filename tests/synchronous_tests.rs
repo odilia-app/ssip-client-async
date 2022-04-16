@@ -7,14 +7,18 @@
 // modified, or distributed except according to those terms.
 
 #[cfg(not(feature = "async-mio"))]
-use ssip_client::*;
+use ssip_client::{client::Source, *};
 #[cfg(not(feature = "async-mio"))]
-use std::{io, os::unix::net::UnixStream};
+use std::{
+    io::{self, Read, Write},
+    net::TcpStream,
+    os::unix::net::UnixStream,
+};
 
 #[cfg(not(feature = "async-mio"))]
 mod server;
 
-/// Create a server and run the client
+/// Create a server on a Unix socket and run the client
 ///
 /// The communication is an array of (["question", ...], "response")
 #[cfg(not(feature = "async-mio"))]
@@ -42,6 +46,29 @@ where
     Ok(())
 }
 
+/// Create a server on a inet socket and run the client
+///
+/// The communication is an array of (["question", ...], "response")
+#[cfg(not(feature = "async-mio"))]
+fn test_tcp_client<F>(
+    communication: &'static [(&'static str, &'static str)],
+    process: F,
+) -> ClientResult<()>
+where
+    F: FnMut(&mut Client<TcpStream>) -> io::Result<()>,
+{
+    let mut process_wrapper = std::panic::AssertUnwindSafe(process);
+    let addr = "127.0.0.1:9999";
+    let handle = server::run_tcp(addr, communication)?;
+    let mut client = ssip_client::tcp::Builder::new(addr)?.build()?;
+    client
+        .set_client_name(ClientName::new("test", "test"))?
+        .check_client_name_set()?;
+    process_wrapper(&mut client)?;
+    handle.join().unwrap().unwrap();
+    Ok(())
+}
+
 #[cfg(not(feature = "async-mio"))]
 const SET_CLIENT_COMMUNICATION: (&str, &str) = (
     "SET self CLIENT_NAME test:test:main\r\n",
@@ -51,16 +78,17 @@ const SET_CLIENT_COMMUNICATION: (&str, &str) = (
 #[test]
 #[cfg(not(feature = "async-mio"))]
 fn connect_and_quit() -> ClientResult<()> {
-    test_unix_client(
-        &[
-            SET_CLIENT_COMMUNICATION,
-            ("QUIT\r\n", "231 HAPPY HACKING\r\n"),
-        ],
-        |client| {
-            client.quit().unwrap().check_status(OK_BYE).unwrap();
-            Ok(())
-        },
-    )
+    const COMMUNICATION: [(&'static str, &'static str); 2] = [
+        SET_CLIENT_COMMUNICATION,
+        ("QUIT\r\n", "231 HAPPY HACKING\r\n"),
+    ];
+    fn process<S: Read + Write + Source>(client: &mut Client<S>) -> io::Result<()> {
+        client.quit().unwrap().check_status(OK_BYE).unwrap();
+        Ok(())
+    }
+    test_unix_client(&COMMUNICATION, process)?;
+    test_tcp_client(&COMMUNICATION, process)?;
+    Ok(())
 }
 
 #[test]

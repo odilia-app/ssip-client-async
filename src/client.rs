@@ -18,10 +18,10 @@ use crate::types::*;
 
 // Trick to have common implementation for std and mio streams..
 #[cfg(all(not(feature = "async-mio"), unix))]
-pub(crate) use std::os::unix::io::AsRawFd as Source;
+pub use std::os::unix::io::AsRawFd as Source;
 
 #[cfg(feature = "async-mio")]
-pub(crate) use mio::event::Source;
+pub use mio::event::Source;
 
 /// Convert boolean to ON or OFF
 fn on_off(value: bool) -> &'static str {

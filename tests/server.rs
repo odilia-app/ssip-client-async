@@ -10,6 +10,7 @@ use std::io::{self, BufRead, BufReader, BufWriter, Read, Write};
 use std::path::Path;
 use std::thread;
 
+use std::net::{TcpListener, ToSocketAddrs};
 use std::os::unix::net::UnixListener;
 
 /// Split lines on CRLF
@@ -51,13 +52,12 @@ fn serve_streams(
 
 /// Server traits
 pub trait Server {
-    fn serve(&mut self) -> io::Result<()>;
+    fn serve(&mut self, communication: &[(&'static str, &'static str)]) -> io::Result<()>;
 }
 
 /// Server on a named socket.
 pub struct UnixServer {
     listener: UnixListener,
-    communication: Vec<(&'static str, &'static str)>,
 }
 
 impl UnixServer {
@@ -65,32 +65,52 @@ impl UnixServer {
     ///
     /// Argument `communication` is an array of pairs. The first item is a list of strings
     /// the server will receive and the second item is the answer.
-    pub fn new<P>(
-        socket_path: P,
-        communication: &[(&'static str, &'static str)],
-    ) -> io::Result<Self>
+    pub fn new<P>(socket_path: P) -> io::Result<Self>
     where
         P: AsRef<Path>,
     {
         let listener = UnixListener::bind(socket_path.as_ref())?;
-        Ok(Self {
-            listener,
-            communication: communication.to_vec(),
-        })
+        Ok(Self { listener })
     }
 }
 
 impl Server for UnixServer {
-    fn serve(&mut self) -> io::Result<()> {
+    fn serve(&mut self, communication: &[(&'static str, &'static str)]) -> io::Result<()> {
         let (mut stream, _) = self.listener.accept()?;
-        serve_streams(&mut stream.try_clone()?, &mut stream, &self.communication)
+        serve_streams(&mut stream.try_clone()?, &mut stream, communication)
+    }
+}
+
+/// Server on a named socket.
+pub struct TcpServer {
+    listener: TcpListener,
+}
+
+impl TcpServer {
+    /// Create a new server on a named socket.
+    ///
+    /// Argument `communication` is an array of pairs. The first item is a list of strings
+    /// the server will receive and the second item is the answer.
+    pub fn new<A: ToSocketAddrs>(addr: A) -> io::Result<Self> {
+        let listener = TcpListener::bind(addr)?;
+        Ok(Self { listener })
+    }
+}
+
+impl Server for TcpServer {
+    fn serve(&mut self, communication: &[(&'static str, &'static str)]) -> io::Result<()> {
+        let (mut stream, _) = self.listener.accept()?;
+        serve_streams(&mut stream.try_clone()?, &mut stream, communication)
     }
 }
 
 /// Run the server in a thread
-pub fn run_server(mut server: Box<dyn Server + Send>) -> thread::JoinHandle<io::Result<()>> {
+pub fn run_server(
+    mut server: Box<dyn Server + Send>,
+    communication: &'static [(&'static str, &'static str)],
+) -> thread::JoinHandle<io::Result<()>> {
     thread::spawn(move || -> io::Result<()> {
-        server.serve()?;
+        server.serve(&communication)?;
         Ok(())
     })
 }
@@ -102,10 +122,17 @@ pub fn run_unix<P>(
 where
     P: AsRef<Path>,
 {
-    Ok(run_server(Box::new(UnixServer::new(
-        &socket_path,
+    Ok(run_server(
+        Box::new(UnixServer::new(&socket_path)?),
         communication,
-    )?)))
+    ))
+}
+
+pub fn run_tcp<A: ToSocketAddrs>(
+    addr: A,
+    communication: &'static [(&'static str, &'static str)],
+) -> io::Result<thread::JoinHandle<io::Result<()>>> {
+    Ok(run_server(Box::new(TcpServer::new(addr)?), communication))
 }
 
 #[cfg(test)]

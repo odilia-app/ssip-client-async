@@ -9,10 +9,14 @@
 #[cfg(feature = "async-mio")]
 use mio::{Events, Poll, Token};
 #[cfg(feature = "async-mio")]
-use std::{slice::Iter, time::Duration};
+use std::{
+    io::{Read, Write},
+    slice::Iter,
+    time::Duration,
+};
 
 #[cfg(feature = "async-mio")]
-use ssip_client::*;
+use ssip_client::{client::Source, *};
 
 #[cfg(feature = "async-mio")]
 mod server;
@@ -64,34 +68,16 @@ impl<'a, 'b> State<'a, 'b> {
     }
 }
 
-#[test]
 #[cfg(feature = "async-mio")]
-fn basic_async_communication() -> ClientResult<()> {
-    const COMMUNICATION: [(&str, &str); 5] = [
-        (
-            "SET self CLIENT_NAME test:test:main\r\n",
-            "208 OK CLIENT NAME SET\r\n",
-        ),
-        ("SET self LANGUAGE en\r\n", "201 OK LANGUAGE SET\r\n"),
-        ("STOP self\r\n", "210 OK STOPPED\r\n"),
-        (
-            "GET OUTPUT_MODULE\r\n",
-            "251-espeak\r\n251 OK GET RETURNED\r\n",
-        ),
-        ("GET RATE\r\n", "251-10\r\n251 OK GET RETURNED\r\n"),
-    ];
-
+fn basic_async_client_communication<S: Read + Write + Source>(
+    client: &mut QueuedClient<S>,
+) -> ClientResult<usize> {
     let get_requests = vec![Request::GetOutputModule, Request::GetRate];
     let get_answers = vec!["espeak", "10"];
     let mut state = State::new(get_requests.iter(), get_answers.iter());
 
-    let socket_dir = tempfile::tempdir()?;
-    let socket_path = socket_dir.path().join("basic_async_communication.socket");
-    assert!(!socket_path.exists());
-    let handle = server::run_unix(&socket_path, &COMMUNICATION)?;
     let mut poll = Poll::new()?;
     let mut events = Events::with_capacity(128);
-    let mut client = QueuedClient::new(fifo::Builder::new().path(&socket_path).build()?);
     let input_token = Token(0);
     let output_token = Token(1);
     let timeout = Duration::new(0, 500 * 1000 * 1000 /* 500 ms */);
@@ -131,8 +117,47 @@ fn basic_async_communication() -> ClientResult<()> {
             }
         }
     }
+    Ok(state.countdown)
+}
+
+#[cfg(feature = "async-mio")]
+const BASIC_COMMUNICATION: [(&str, &str); 5] = [
+    (
+        "SET self CLIENT_NAME test:test:main\r\n",
+        "208 OK CLIENT NAME SET\r\n",
+    ),
+    ("SET self LANGUAGE en\r\n", "201 OK LANGUAGE SET\r\n"),
+    ("STOP self\r\n", "210 OK STOPPED\r\n"),
+    (
+        "GET OUTPUT_MODULE\r\n",
+        "251-espeak\r\n251 OK GET RETURNED\r\n",
+    ),
+    ("GET RATE\r\n", "251-10\r\n251 OK GET RETURNED\r\n"),
+];
+
+#[test]
+#[cfg(feature = "async-mio")]
+fn basic_async_unix_communication() -> ClientResult<()> {
+    let socket_dir = tempfile::tempdir()?;
+    let socket_path = socket_dir.path().join("basic_async_communication.socket");
+    assert!(!socket_path.exists());
+    let handle = server::run_unix(&socket_path, &BASIC_COMMUNICATION)?;
+    let mut client = QueuedClient::new(fifo::Builder::new().path(&socket_path).build()?);
+    let countdown = basic_async_client_communication(&mut client)?;
     handle.join().unwrap().unwrap();
-    assert!(state.countdown > 0);
     socket_dir.close()?;
+    assert!(countdown > 0);
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "async-mio")]
+fn basic_async_tcp_communication() -> ClientResult<()> {
+    let addr = "127.0.0.1:9999";
+    let handle = server::run_tcp(addr, &BASIC_COMMUNICATION)?;
+    let mut client = QueuedClient::new(tcp::Builder::new(addr.parse().unwrap()).build()?);
+    let countdown = basic_async_client_communication(&mut client)?;
+    handle.join().unwrap().unwrap();
+    assert!(countdown > 0);
     Ok(())
 }

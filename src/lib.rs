@@ -35,6 +35,8 @@ mod types;
 pub mod client;
 pub mod constants;
 pub mod fifo;
+pub mod net;
+pub mod tcp;
 
 #[cfg(any(not(feature = "async-mio"), doc))]
 pub use client::Client;
