@@ -78,7 +78,7 @@ const SET_CLIENT_COMMUNICATION: (&str, &str) = (
 #[test]
 #[cfg(not(feature = "async-mio"))]
 fn connect_and_quit() -> ClientResult<()> {
-    const COMMUNICATION: [(&'static str, &'static str); 2] = [
+    const COMMUNICATION: [(&str, &str); 2] = [
         SET_CLIENT_COMMUNICATION,
         ("QUIT\r\n", "231 HAPPY HACKING\r\n"),
     ];

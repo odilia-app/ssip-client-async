@@ -110,7 +110,7 @@ pub fn run_server(
     communication: &'static [(&'static str, &'static str)],
 ) -> thread::JoinHandle<io::Result<()>> {
     thread::spawn(move || -> io::Result<()> {
-        server.serve(&communication)?;
+        server.serve(communication)?;
         Ok(())
     })
 }
