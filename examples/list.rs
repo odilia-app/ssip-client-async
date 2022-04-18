@@ -1,10 +1,10 @@
-#[cfg(not(feature = "async-mio"))]
+#[cfg(all(unix, not(feature = "async-mio")))]
 use ssip_client::{
     fifo, ClientName, ClientResult, SynthesisVoice, OK_OUTPUT_MODULES_LIST_SENT,
     OK_VOICES_LIST_SENT,
 };
 
-#[cfg(not(feature = "async-mio"))]
+#[cfg(all(unix, not(feature = "async-mio")))]
 fn main() -> ClientResult<()> {
     fn voice_to_string(voice: &SynthesisVoice) -> String {
         match &voice.language {
@@ -54,7 +54,12 @@ fn main() -> ClientResult<()> {
     Ok(())
 }
 
-#[cfg(feature = "async-mio")]
+#[cfg(all(unix, feature = "async-mio"))]
 fn main() {
     println!("asynchronous client not implemented");
+}
+
+#[cfg(not(unix))]
+fn main() {
+    println!("example only available on unix.");
 }

@@ -7,11 +7,10 @@
 // modified, or distributed except according to those terms.
 
 use std::io::{self, BufRead, BufReader, BufWriter, Read, Write};
-use std::path::Path;
+use std::net::{Shutdown, TcpListener, ToSocketAddrs};
 use std::thread;
-
-use std::net::{TcpListener, ToSocketAddrs};
-use std::os::unix::net::UnixListener;
+#[cfg(unix)]
+use std::{os::unix::net::UnixListener, path::Path};
 
 /// Split lines on CRLF
 fn split_lines(lines: &str) -> Vec<String> {
@@ -56,10 +55,12 @@ pub trait Server {
 }
 
 /// Server on a named socket.
+#[cfg(unix)]
 pub struct UnixServer {
     listener: UnixListener,
 }
 
+#[cfg(unix)]
 impl UnixServer {
     /// Create a new server on a named socket.
     ///
@@ -74,6 +75,7 @@ impl UnixServer {
     }
 }
 
+#[cfg(unix)]
 impl Server for UnixServer {
     fn serve(&mut self, communication: &[(&'static str, &'static str)]) -> io::Result<()> {
         let (mut stream, _) = self.listener.accept()?;
@@ -100,7 +102,8 @@ impl TcpServer {
 impl Server for TcpServer {
     fn serve(&mut self, communication: &[(&'static str, &'static str)]) -> io::Result<()> {
         let (mut stream, _) = self.listener.accept()?;
-        serve_streams(&mut stream.try_clone()?, &mut stream, communication)
+        serve_streams(&mut stream.try_clone()?, &mut stream, communication)?;
+        stream.shutdown(Shutdown::Both)
     }
 }
 
@@ -115,6 +118,7 @@ pub fn run_server(
     })
 }
 
+#[cfg(unix)]
 pub fn run_unix<P>(
     socket_path: P,
     communication: &'static [(&'static str, &'static str)],

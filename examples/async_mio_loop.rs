@@ -1,16 +1,16 @@
-#[cfg(feature = "async-mio")]
+#[cfg(all(unix, feature = "async-mio"))]
 use mio::{unix::SourceFd, Events, Interest, Poll, Token};
-#[cfg(feature = "async-mio")]
+#[cfg(all(unix, feature = "async-mio"))]
 use std::{
     collections::VecDeque,
     io::{self, Write},
     os::unix::io::AsRawFd,
 };
 
-#[cfg(feature = "async-mio")]
-use ssip_client::{fifo, QueuedClient, ClientError, ClientName, ClientResult, Request, Response};
+#[cfg(all(unix, feature = "async-mio"))]
+use ssip_client::{fifo, ClientError, ClientName, ClientResult, QueuedClient, Request, Response};
 
-#[cfg(feature = "async-mio")]
+#[cfg(all(unix, feature = "async-mio"))]
 fn main() -> ClientResult<()> {
     let stdin = io::stdin();
 
@@ -97,7 +97,12 @@ fn main() -> ClientResult<()> {
     }
 }
 
-#[cfg(not(feature = "async-mio"))]
+#[cfg(all(unix, not(feature = "async-mio")))]
 fn main() {
     println!("see hello for an example of synchronous client.");
+}
+
+#[cfg(not(unix))]
+fn main() {
+    println!("example only available on unix.");
 }

@@ -1,6 +1,6 @@
 [package]
 name = "ssip-client"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["Laurent Pelecq <lpelecq+rust@circoise.eu>"]
 edition = "2018"
 description = "Client API for Speech Dispatcher"
@@ -22,6 +22,7 @@ async-mio = ["mio/net", "mio/os-poll"]
 
 [dev-dependencies]
 mio = { version = "0.8", features = ["os-poll", "os-ext"] }
+lazy_static = "1"
 popol = "0.5"
 tempfile = "3"
 

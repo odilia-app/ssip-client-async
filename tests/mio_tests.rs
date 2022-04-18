@@ -136,7 +136,7 @@ const BASIC_COMMUNICATION: [(&str, &str); 5] = [
 ];
 
 #[test]
-#[cfg(feature = "async-mio")]
+#[cfg(all(unix, feature = "async-mio"))]
 fn basic_async_unix_communication() -> ClientResult<()> {
     let socket_dir = tempfile::tempdir()?;
     let socket_path = socket_dir.path().join("basic_async_communication.socket");

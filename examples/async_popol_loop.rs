@@ -1,13 +1,13 @@
-#[cfg(not(feature = "async-mio"))]
+#[cfg(all(unix, not(feature = "async-mio")))]
 use std::{
     collections::VecDeque,
     io::{self, Write},
 };
 
-#[cfg(not(feature = "async-mio"))]
+#[cfg(all(unix, not(feature = "async-mio")))]
 use ssip_client::{fifo, ClientError, ClientName, ClientResult, QueuedClient, Request, Response};
 
-#[cfg(not(feature = "async-mio"))]
+#[cfg(all(unix, not(feature = "async-mio")))]
 fn main() -> ClientResult<()> {
     #[derive(Clone, Eq, PartialEq)]
     enum SourceKey {
@@ -113,7 +113,12 @@ fn main() -> ClientResult<()> {
     }
 }
 
-#[cfg(feature = "async-mio")]
+#[cfg(all(unix, feature = "async-mio"))]
 fn main() {
-    println!("see async_mio_loop for an example of asynchronous client.");
+    println!("asynchronous client not implemented");
+}
+
+#[cfg(not(unix))]
+fn main() {
+    println!("example only available on unix.");
 }

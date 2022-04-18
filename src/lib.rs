@@ -34,6 +34,7 @@ mod types;
 
 pub mod client;
 pub mod constants;
+#[cfg(unix)]
 pub mod fifo;
 pub mod net;
 pub mod tcp;

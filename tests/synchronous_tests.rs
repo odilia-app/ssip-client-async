@@ -8,11 +8,16 @@
 
 #[cfg(not(feature = "async-mio"))]
 use ssip_client::{client::Source, *};
+#[cfg(all(unix, not(feature = "async-mio")))]
+use std::os::unix::net::UnixStream;
 #[cfg(not(feature = "async-mio"))]
 use std::{
     io::{self, Read, Write},
     net::TcpStream,
-    os::unix::net::UnixStream,
+    sync::{
+        atomic::{AtomicU16, Ordering as AtomicOrdering},
+        Arc,
+    },
 };
 
 #[cfg(not(feature = "async-mio"))]
@@ -21,7 +26,7 @@ mod server;
 /// Create a server on a Unix socket and run the client
 ///
 /// The communication is an array of (["question", ...], "response")
-#[cfg(not(feature = "async-mio"))]
+#[cfg(all(unix, not(feature = "async-mio")))]
 fn test_unix_client<F>(
     communication: &'static [(&'static str, &'static str)],
     process: F,
@@ -46,6 +51,11 @@ where
     Ok(())
 }
 
+#[cfg(not(feature = "async-mio"))]
+lazy_static::lazy_static! {
+    static ref TCP_PORT: Arc<AtomicU16> = Arc::new(AtomicU16::new(10000));
+}
+
 /// Create a server on a inet socket and run the client
 ///
 /// The communication is an array of (["question", ...], "response")
@@ -58,15 +68,30 @@ where
     F: FnMut(&mut Client<TcpStream>) -> io::Result<()>,
 {
     let mut process_wrapper = std::panic::AssertUnwindSafe(process);
-    let addr = "127.0.0.1:9999";
-    let handle = server::run_tcp(addr, communication)?;
-    let mut client = ssip_client::tcp::Builder::new(addr)?.build()?;
+    let tcp_port = TCP_PORT.clone().fetch_add(1, AtomicOrdering::SeqCst);
+    let addr = format!("127.0.0.1:{}", tcp_port);
+    let handle = server::run_tcp(&addr, communication)?;
+    let mut client = ssip_client::tcp::Builder::new(&addr)?.build()?;
     client
         .set_client_name(ClientName::new("test", "test"))?
         .check_client_name_set()?;
     process_wrapper(&mut client)?;
     handle.join().unwrap().unwrap();
     Ok(())
+}
+
+#[cfg(all(unix, not(feature = "async-mio")))]
+macro_rules! test_client {
+    ($communication:expr, $closure:expr) => {
+        test_unix_client($communication, $closure)
+    };
+}
+
+#[cfg(all(not(unix), not(feature = "async-mio")))]
+macro_rules! test_client {
+    ($communication:expr, $closure:expr) => {
+        test_tcp_client($communication, $closure)
+    };
 }
 
 #[cfg(not(feature = "async-mio"))]
@@ -86,6 +111,7 @@ fn connect_and_quit() -> ClientResult<()> {
         client.quit().unwrap().check_status(OK_BYE).unwrap();
         Ok(())
     }
+    #[cfg(unix)]
     test_unix_client(&COMMUNICATION, process)?;
     test_tcp_client(&COMMUNICATION, process)?;
     Ok(())
@@ -94,7 +120,7 @@ fn connect_and_quit() -> ClientResult<()> {
 #[test]
 #[cfg(not(feature = "async-mio"))]
 fn say_one_line() -> ClientResult<()> {
-    test_unix_client(
+    test_client!(
         &[
             SET_CLIENT_COMMUNICATION,
             ("SPEAK\r\n", "230 OK RECEIVING DATA\r\n"),
@@ -117,7 +143,7 @@ fn say_one_line() -> ClientResult<()> {
                     .unwrap()
             );
             Ok(())
-        },
+        }
     )
 }
 
@@ -126,12 +152,12 @@ macro_rules! test_setter {
         #[test]
         #[cfg(not(feature = "async-mio"))]
         fn $setter() -> ClientResult<()> {
-            test_unix_client(
+            test_client!(
                 &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
                 |client| {
                     client.$setter($($arg)*).unwrap().check_status($code).unwrap();
                     Ok(())
-                },
+                }
             )
         }
     };
@@ -142,13 +168,13 @@ macro_rules! test_getter {
         #[test]
         #[cfg(not(feature = "async-mio"))]
         fn $getter() -> ClientResult<()> {
-            test_unix_client(
+            test_client!(
                 &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
                 |client| {
                     let value = client.$getter $get_args.unwrap().$receive $recv_arg.unwrap();
                     assert_eq!($value, value);
                     Ok(())
-                },
+                }
             )
         }
     };
@@ -165,13 +191,13 @@ macro_rules! test_list {
         #[test]
         #[cfg(not(feature = "async-mio"))]
         fn $getter() -> ClientResult<()> {
-            test_unix_client(
+            test_client!(
                 &[SET_CLIENT_COMMUNICATION, ($question, $answer)],
                 |client| {
                     let values = client.$getter().unwrap().receive_lines($code).unwrap();
                     assert_eq!($values, values.as_slice());
                     Ok(())
-                },
+                }
             )
         }
     };
@@ -188,7 +214,7 @@ test_setter!(
 #[test]
 #[cfg(not(feature = "async-mio"))]
 fn set_debug() -> ClientResult<()> {
-    test_unix_client(
+    test_client!(
         &[
             SET_CLIENT_COMMUNICATION,
             (
@@ -204,7 +230,7 @@ fn set_debug() -> ClientResult<()> {
                 .unwrap();
             assert_eq!("/run/user/100/speech-dispatcher/log/debug", output);
             Ok(())
-        },
+        }
     )
 }
 
@@ -364,7 +390,7 @@ test_list!(
 #[test]
 #[cfg(not(feature = "async-mio"))]
 fn list_synthesis_voices() -> ClientResult<()> {
-    test_unix_client(
+    test_client!(
         &[
             SET_CLIENT_COMMUNICATION,
             (
@@ -383,14 +409,14 @@ fn list_synthesis_voices() -> ClientResult<()> {
                 assert_eq!(*expected, *found);
             }
             Ok(())
-        },
+        }
     )
 }
 
 #[test]
 #[cfg(not(feature = "async-mio"))]
 fn receive_notification() -> ClientResult<()> {
-    test_unix_client(
+    test_client!(
         &[
             SET_CLIENT_COMMUNICATION,
             ("SPEAK\r\n", "230 OK RECEIVING DATA\r\n"),
@@ -420,14 +446,14 @@ fn receive_notification() -> ClientResult<()> {
                 Ok(_) => panic!("wrong event"),
                 Err(_) => panic!("error on event"),
             }
-        },
+        }
     )
 }
 
 #[test]
 #[cfg(not(feature = "async-mio"))]
 fn history_clients_list() -> ClientResult<()> {
-    test_unix_client(
+    test_client!(
         &[
             SET_CLIENT_COMMUNICATION,
             (
@@ -446,7 +472,7 @@ fn history_clients_list() -> ClientResult<()> {
                 assert_eq!(*expected, *found);
             }
             Ok(())
-        },
+        }
     )
 }
 

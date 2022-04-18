@@ -1,9 +1,9 @@
-#[cfg(not(feature = "async-mio"))]
+#[cfg(all(unix, not(feature = "async-mio")))]
 use ssip_client::{
     fifo, ClientName, ClientResult, EventType, NotificationType, OK_NOTIFICATION_SET,
 };
 
-#[cfg(not(feature = "async-mio"))]
+#[cfg(all(unix, not(feature = "async-mio")))]
 fn main() -> ClientResult<()> {
     let mut client = fifo::Builder::new().build()?;
     client
@@ -43,7 +43,12 @@ fn main() -> ClientResult<()> {
     Ok(())
 }
 
-#[cfg(feature = "async-mio")]
+#[cfg(all(unix, feature = "async-mio"))]
 fn main() {
     println!("asynchronous client not implemented");
+}
+
+#[cfg(not(unix))]
+fn main() {
+    println!("example only available on unix.");
 }
