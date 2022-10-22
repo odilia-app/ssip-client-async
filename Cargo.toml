@@ -23,6 +23,6 @@ async-mio = ["mio/net", "mio/os-poll"]
 [dev-dependencies]
 mio = { version = "0.8", features = ["os-poll", "os-ext"] }
 lazy_static = "1"
-popol = "0.5"
+popol = "1"
 tempfile = "3"
 
