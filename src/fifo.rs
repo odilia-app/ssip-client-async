@@ -155,6 +155,51 @@ mod asynchronous {
         }
     }
 }
+#[cfg(feature = "tokio")]
+mod asynchronous_tokio {
+    pub use tokio::net::UnixStream;
+    use tokio::io::{self, BufReader, BufWriter};
+    use std::path::Path;
+
+    use crate::tokio::AsyncClient;
+
+    use super::FifoPath;
+
+    pub struct Builder {
+        path: FifoPath,
+    }
+
+    impl Builder {
+        pub fn new() -> Self {
+            Self {
+                path: FifoPath::new(),
+            }
+        }
+
+        pub fn path<P>(&mut self, socket_path: P) -> &mut Self
+        where
+            P: AsRef<Path>,
+        {
+            self.path.set(socket_path);
+            self
+        }
+
+        fn non_blocking(socket: UnixStream) -> io::Result<UnixStream> {
+            socket.set_nonblocking(true)?;
+            Ok(socket)
+        }
+
+        pub fn build(&self) -> io::Result<AsyncClient<UnixStream, UnixStream>> {
+            let stream = UnixStream::connect(self.path.get()?)?;
+            Ok(AsyncClient::new(
+                BufReader::new(UnixStream::from_std(Self::non_blocking(
+                    stream.try_clone()?,
+                )?)),
+                BufWriter::new(UnixStream::from_std(Self::non_blocking(stream)?)),
+            ))
+        }
+    }
+}
 
 #[cfg(feature = "async-mio")]
 pub use asynchronous::{Builder, UnixStream};

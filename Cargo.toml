@@ -16,17 +16,18 @@ mio = { version = "0.8", optional = true }
 thiserror = "1"
 strum = "0.24"
 strum_macros = "0.24"
-tokio = { version = "^1.21.2", features = ["io-util"] }
+tokio = { version = "^1.21.2", features = ["io-util", "rt", "macros", "net"] }
+async-std = { version = "1.12.0", default_features = true }
 
 [features]
 async-mio = ["mio/net", "mio/os-poll"]
-tokio = ["tokio/io-util"]
+tokio = ["tokio/io-util", "tokio/rt", "tokio/macros"]
 async-std = ["async-std/default"]
 
 [dev-dependencies]
 mio = { version = "0.8", features = ["os-poll", "os-ext"] }
-tokio = { version = "^1.21.2", features = ["io-util"] }
-async-std = { version = "1.12.0" }
+tokio = { version = "^1.21.2", features = ["io-util", "rt"] }
+async-std = { version = "1.12.0", default_features = true }
 lazy_static = "1"
 popol = "1"
 tempfile = "3"

@@ -16,7 +16,7 @@ use crate::protocol::{
 };
 use crate::types::*;
 
-use async_std::io::{AsyncBufRead, AsyncWrite};
+use async_std::io::{BufRead as AsyncBufRead, Write as AsyncWrite};
 
 /// Convert boolean to ON or OFF
 fn on_off(value: bool) -> &'static str {
@@ -190,7 +190,7 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     /// Send lines of text (terminated by a single dot).
     pub async fn send_lines(&mut self, lines: &[String]) -> ClientResult<&mut Self> {
         const END_OF_DATA: [&str; 1] = ["."];
-        write_lines_tokio(
+        write_lines_async_std(
             &mut self.output,
             lines
                 .iter()
@@ -198,12 +198,12 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
                 .collect::<Vec<&str>>()
                 .as_slice(),
         ).await?;
-        flush_lines_tokio(&mut self.output, &END_OF_DATA).await?;
+        flush_lines_async_std(&mut self.output, &END_OF_DATA).await?;
         Ok(self)
     }
     /// Receive answer from server
     async fn receive_answer(&mut self, lines: &mut Vec<String>) -> ClientStatus {
-        crate::protocol::receive_answer_tokio(&mut self.input, Some(lines)).await
+        crate::protocol::receive_answer_async_std(&mut self.input, Some(lines)).await
     }
     /// Receive one response.
     pub async fn receive(&mut self) -> ClientResult<Response> {

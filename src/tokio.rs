@@ -9,11 +9,10 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-use std::io::{self, Read, Write};
 
 use crate::constants::*;
 use crate::protocol::{
-    flush_lines, parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines,
+    parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines,
     flush_lines_tokio, write_lines_tokio,
 };
 use crate::types::*;
@@ -145,35 +144,6 @@ pub enum Response {
     EventCanceled(EventId),                          // 703
     EventPaused(EventId),                            // 704
     EventResumed(EventId),                           // 705
-}
-
-macro_rules! send_one_line {
-    ($self:expr, $fmt:expr, $( $arg:expr ),+) => {
-        flush_lines(&mut $self.output, &[format!($fmt, $( $arg ),+).as_str()])
-    };
-    ($self:expr, $fmt:expr) => {
-        flush_lines(&mut $self.output, &[$fmt])
-    }
-}
-
-macro_rules! send_toggle {
-    ($output:expr, $fmt:expr, $val:expr) => {
-        send_one_line!($output, $fmt, on_off($val))
-    };
-    ($output:expr, $fmt:expr, $arg:expr, $val:expr) => {
-        send_one_line!($output, $fmt, $arg, on_off($val))
-    };
-}
-
-macro_rules! send_range {
-    ($output:expr, $fmt:expr, $scope:expr, $val:expr) => {
-        send_one_line!(
-            $output,
-            $fmt,
-            $scope,
-            std::cmp::max(-100, std::cmp::min(100, $val))
-        )
-    };
 }
 
 /// SSIP client on generic async stream
