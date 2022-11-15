@@ -1,22 +1,31 @@
 extern crate tokio;
-use ssip_client::{fifo, ClientName, ClientResult};
+use ssip_client::{fifo::asynchronous_tokio::Builder, ClientName, ClientResult};
 
 #[cfg(all(unix, feature = "tokio"))]
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> ClientResult<()> {
-    let mut client = fifo::Builder::new().build()?;
+    println!("Example:");
+    let mut client = Builder::new().build().await?;
+    println!("Client created.");
     client
-        .set_client_name(ClientName::new("joe", "hello"))?
-        .check_client_name_set()?;
+        .set_client_name(ClientName::new("test", "hello")).await?
+        .check_client_name_set().await?;
+    println!("Client connected");
     let msg_id = client
-        .speak()?
-        .check_receiving_data()?
-        .send_line("Lorem ipsum dollar mit amit dor BIG CHEESE! Hi 123 hi 123 hi 123 hi 123.")?
-        .receive_message_id()?;
+        .speak().await?
+        .check_receiving_data().await?
+        .send_line("Lorem ipsum dollar mit amit dor BIG CHEESE! Hi 123 hi 123 hi 123 hi 123.").await?
+        .receive_message_id().await?;
     println!("message: {}", msg_id);
-    let volume = client.get_volume()?.receive_u8()?;
+    let volume = client.get_volume().await?.receive_u8().await?;
     println!("volume: {}", volume);
-    client.quit()?;
+    /*
+    match client.set_volume(10) {
+      Ok(id) => println!("Volume change ID: {}", id),
+      Err(e) => println!("Error: {:?}", e),
+    };
+    */
+    client.quit().await?;
     Ok(())
 }
 

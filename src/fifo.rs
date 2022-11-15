@@ -156,9 +156,13 @@ mod asynchronous {
     }
 }
 #[cfg(feature = "tokio")]
-mod asynchronous_tokio {
-    pub use tokio::net::UnixStream;
-    use tokio::io::{self, BufReader, BufWriter};
+pub mod asynchronous_tokio {
+    pub use tokio::net::{
+      UnixStream,
+      unix::OwnedReadHalf,
+      unix::OwnedWriteHalf,
+    };
+    use tokio::io::{self, BufReader as AsyncBufReader, BufWriter as AsyncBufWriter};
     use std::path::Path;
 
     use crate::tokio::AsyncClient;
@@ -184,18 +188,14 @@ mod asynchronous_tokio {
             self
         }
 
-        fn non_blocking(socket: UnixStream) -> io::Result<UnixStream> {
-            socket.set_nonblocking(true)?;
-            Ok(socket)
-        }
-
-        pub fn build(&self) -> io::Result<AsyncClient<UnixStream, UnixStream>> {
-            let stream = UnixStream::connect(self.path.get()?)?;
+        pub async fn build(&self) -> io::Result<AsyncClient<AsyncBufReader<OwnedReadHalf>, AsyncBufWriter<OwnedWriteHalf>>> {
+            println!("Attempting build!");
+            let (read_stream, write_stream) = UnixStream::connect(self.path.get()?).await?
+              .into_split();
+            println!("Read and write streams built.");
             Ok(AsyncClient::new(
-                BufReader::new(UnixStream::from_std(Self::non_blocking(
-                    stream.try_clone()?,
-                )?)),
-                BufWriter::new(UnixStream::from_std(Self::non_blocking(stream)?)),
+                AsyncBufReader::new(read_stream),
+                AsyncBufWriter::new(write_stream),
             ))
         }
     }

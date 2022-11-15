@@ -17,7 +17,35 @@ use crate::protocol::{
 };
 use crate::types::*;
 
-use tokio::io::{AsyncBufRead, AsyncWrite};
+macro_rules! send_one_line {
+    ($self:expr, $fmt:expr, $( $arg:expr ),+) => {
+        flush_lines_tokio(&mut $self.output, &[format!($fmt, $( $arg ),+).as_str()]).await
+    };
+    ($self:expr, $fmt:expr) => {
+        flush_lines_tokio(&mut $self.output, &[$fmt]).await
+    }
+}
+macro_rules! send_toggle {
+    ($output:expr, $fmt:expr, $val:expr) => {
+        send_one_line!($output, $fmt, on_off($val))
+    };
+    ($output:expr, $fmt:expr, $arg:expr, $val:expr) => {
+        send_one_line!($output, $fmt, $arg, on_off($val))
+    };
+}
+    
+macro_rules! send_range {
+    ($output:expr, $fmt:expr, $scope:expr, $val:expr) => {
+        send_one_line!(
+            $output,
+            $fmt,
+            $scope,
+            std::cmp::max(-100, std::cmp::min(100, $val))
+        )
+    };
+}
+
+use tokio::io::{AsyncBufRead, AsyncRead, AsyncWrite};
 
 /// Convert boolean to ON or OFF
 fn on_off(value: bool) -> &'static str {
@@ -173,15 +201,18 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
         flush_lines_tokio(&mut self.output, &END_OF_DATA).await?;
         Ok(self)
     }
+    pub async fn send_line(&mut self, line: &str) -> ClientResult<&mut Self> {
+      self.send(Request::SendLine(line.to_string())).await
+    }
     /// Receive answer from server
-    async fn receive_answer(&mut self, lines: &mut Vec<String>) -> ClientStatus {
-        crate::protocol::receive_answer_tokio(&mut self.input, Some(lines)).await
+    async fn receive_answer(&mut self, lines: Option<&mut Vec<String>>) -> ClientStatus {
+        crate::protocol::receive_answer_tokio(&mut self.input, lines).await
     }
     /// Receive one response.
     pub async fn receive(&mut self) -> ClientResult<Response> {
         const MSG_CURSOR_SET_FIRST: &str = "OK CURSOR SET FIRST";
         let mut lines = Vec::new();
-        let status = self.receive_answer(&mut lines).await?;
+        let status = self.receive_answer(Some(&mut lines)).await?;
         match status.code {
             OK_LANGUAGE_SET => Ok(Response::LanguageSet),
             OK_PRIORITY_SET => Ok(Response::PrioritySet),
@@ -255,5 +286,522 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
             _ => panic!("error should have been caught earlier"),
         }
     }
-}
+    /// Send a request
+    pub async fn send(&mut self, request: Request) -> ClientResult<&mut Self> {
+        match request {
+            Request::SetName(client_name) => send_one_line!(
+                self,
+                "SET self CLIENT_NAME {}:{}:{}",
+                client_name.user,
+                client_name.application,
+                client_name.component
+            ),
+            Request::Speak => send_one_line!(self, "SPEAK"),
+            Request::SendLine(line) => send_one_line!(self, &line).map(|_| ()),
+            Request::SendLines(lines) => self.send_lines(&lines).await.map(|_| ()),
+            Request::SpeakChar(ch) => send_one_line!(self, "CHAR {}", ch),
+            Request::SpeakKey(key) => send_one_line!(self, "KEY {}", key),
+            Request::Stop(scope) => send_one_line!(self, "STOP {}", scope),
+            Request::Cancel(scope) => send_one_line!(self, "CANCEL {}", scope),
+            Request::Pause(scope) => send_one_line!(self, "PAUSE {}", scope),
+            Request::Resume(scope) => send_one_line!(self, "RESUME {}", scope),
+            Request::SetPriority(prio) => send_one_line!(self, "SET self PRIORITY {}", prio),
+            Request::SetDebug(value) => send_toggle!(self, "SET all DEBUG {}", value),
+            Request::SetOutputModule(scope, value) => {
+                send_one_line!(self, "SET {} OUTPUT_MODULE {}", scope, value)
+            }
+            Request::GetOutputModule => send_one_line!(self, "GET OUTPUT_MODULE"),
+            Request::ListOutputModules => send_one_line!(self, "LIST OUTPUT_MODULES"),
+            Request::SetLanguage(scope, lang) => {
+                send_one_line!(self, "SET {} LANGUAGE {}", scope, lang)
+            }
+            Request::GetLanguage => send_one_line!(self, "GET LANGUAGE"),
+            Request::SetSsmlMode(value) => send_toggle!(self, "SET self SSML_MODE {}", value),
+            Request::SetPunctuationMode(scope, mode) => {
+                send_one_line!(self, "SET {} PUNCTUATION {}", scope, mode)
+            }
+            Request::SetSpelling(scope, value) => {
+                send_toggle!(self, "SET {} SPELLING {}", scope, value)
+            }
+            Request::SetCapitalLettersRecognitionMode(scope, mode) => {
+                send_one_line!(self, "SET {} CAP_LET_RECOGN {}", scope, mode)
+            }
+            Request::SetVoiceType(scope, value) => {
+                send_one_line!(self, "SET {} VOICE_TYPE {}", scope, value)
+            }
+            Request::GetVoiceType => send_one_line!(self, "GET VOICE_TYPE"),
+            Request::ListVoiceTypes => send_one_line!(self, "LIST VOICES"),
+            Request::SetSynthesisVoice(scope, value) => {
+                send_one_line!(self, "SET {} SYNTHESIS_VOICE {}", scope, value)
+            }
+            Request::ListSynthesisVoices => send_one_line!(self, "LIST SYNTHESIS_VOICES"),
+            Request::SetRate(scope, value) => send_range!(self, "SET {} RATE {}", scope, value),
+            Request::GetRate => send_one_line!(self, "GET RATE"),
+            Request::SetPitch(scope, value) => send_range!(self, "SET {} PITCH {}", scope, value),
+            Request::GetPitch => send_one_line!(self, "GET PITCH"),
+            Request::SetVolume(scope, value) => {
+                send_range!(self, "SET {} VOLUME {}", scope, value)
+            }
+            Request::GetVolume => send_one_line!(self, "GET VOLUME"),
+            Request::SetPauseContext(scope, value) => {
+                send_one_line!(self, "SET {} PAUSE_CONTEXT {}", scope, value)
+            }
+            Request::SetHistory(scope, value) => {
+                send_toggle!(self, "SET {} HISTORY {}", scope, value)
+            }
+            Request::SetNotification(ntype, value) => {
+                send_toggle!(self, "SET self NOTIFICATION {} {}", ntype, value)
+            }
+            Request::Begin => send_one_line!(self, "BLOCK BEGIN"),
+            Request::End => send_one_line!(self, "BLOCK END"),
+            Request::HistoryGetClients => send_one_line!(self, "HISTORY GET CLIENT_LIST"),
+            Request::HistoryGetClientId => send_one_line!(self, "HISTORY GET CLIENT_ID"),
+            Request::HistoryGetClientMsgs(scope, start, number) => send_one_line!(
+                self,
+                "HISTORY GET CLIENT_MESSAGES {} {}_{}",
+                scope,
+                start,
+                number
+            ),
+            Request::HistoryGetLastMsgId => send_one_line!(self, "HISTORY GET LAST"),
+            Request::HistoryGetMsg(id) => send_one_line!(self, "HISTORY GET MESSAGE {}", id),
+            Request::HistoryCursorGet => send_one_line!(self, "HISTORY CURSOR GET"),
+            Request::HistoryCursorSet(scope, pos) => {
+                send_one_line!(self, "HISTORY CURSOR SET {} {}", scope, pos)
+            }
+            Request::HistoryCursorMove(direction) => {
+                send_one_line!(self, "HISTORY CURSOR {}", direction)
+            }
+            Request::HistorySpeak(id) => send_one_line!(self, "HISTORY SAY {}", id),
+            Request::HistorySort(direction, key) => {
+                send_one_line!(self, "HISTORY SORT {} {}", direction, key)
+            }
+            Request::HistorySetShortMsgLength(length) => {
+                send_one_line!(self, "HISTORY SET SHORT_MESSAGE_LENGTH {}", length)
+            }
+            Request::HistorySetMsgTypeOrdering(ordering) => {
+                send_one_line!(
+                    self,
+                    "HISTORY SET MESSAGE_TYPE_ORDERING \"{}\"",
+                    ordering
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(" ")
+                )
+            }
+            Request::HistorySearch(scope, condition) => {
+                send_one_line!(self, "HISTORY SEARCH {} \"{}\"", scope, condition)
+            }
+            Request::Quit => send_one_line!(self, "QUIT"),
+        }?;
+        Ok(self)
+    }
 
+    /// Set the client name. It must be the first call on startup.
+    pub async fn set_client_name(&mut self, client_name: ClientName) -> ClientResult<&mut Self> {
+        self.send(Request::SetName(client_name)).await
+    }
+
+    /// Initiate communitation to send text to speak
+    pub async fn speak(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::Speak).await
+    }
+
+    /// Speak a char
+    pub async fn speak_char(&mut self, ch: char) -> ClientResult<&mut Self> {
+        self.send(Request::SpeakChar(ch)).await
+    }
+
+    /// Speak a symbolic key name
+    pub async fn speak_key(&mut self, key_name: KeyName) -> ClientResult<&mut Self> {
+        self.send(Request::SpeakKey(key_name)).await
+    }
+
+    /// Stop current message
+    pub async fn stop(&mut self, scope: MessageScope) -> ClientResult<&mut Self> {
+        self.send(Request::Stop(scope)).await
+    }
+
+    /// Cancel current message
+    pub async fn cancel(&mut self, scope: MessageScope) -> ClientResult<&mut Self> {
+        self.send(Request::Cancel(scope)).await
+    }
+
+    /// Pause current message
+    pub async fn pause(&mut self, scope: MessageScope) -> ClientResult<&mut Self> {
+        self.send(Request::Pause(scope)).await
+    }
+
+    /// Resume current message
+    pub async fn resume(&mut self, scope: MessageScope) -> ClientResult<&mut Self> {
+        self.send(Request::Resume(scope)).await
+    }
+
+    /// Set message priority
+    pub async fn set_priority(&mut self, prio: Priority) -> ClientResult<&mut Self> {
+        self.send(Request::SetPriority(prio)).await
+    }
+
+    /// Set debug mode. Return the log location
+    pub async fn set_debug(&mut self, value: bool) -> ClientResult<&mut Self> {
+        self.send(Request::SetDebug(value)).await
+    }
+
+    /// Set output module
+    pub async fn set_output_module(
+        &mut self,
+        scope: ClientScope,
+        value: &str,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::SetOutputModule(scope, value.to_string())).await
+    }
+
+    /// Get the current output module
+    pub async fn get_output_module(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::GetOutputModule).await
+    }
+
+    /// List the available output modules
+    pub async fn list_output_modules(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::ListOutputModules).await
+    }
+
+    /// Set language code
+    pub async fn set_language(&mut self, scope: ClientScope, value: &str) -> ClientResult<&mut Self> {
+        self.send(Request::SetLanguage(scope, value.to_string())).await
+    }
+
+    /// Get the current language
+    pub async fn get_language(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::GetLanguage).await
+    }
+
+    /// Set SSML mode (Speech Synthesis Markup Language)
+    pub async fn set_ssml_mode(&mut self, mode: bool) -> ClientResult<&mut Self> {
+        self.send(Request::SetSsmlMode(mode)).await
+    }
+
+    /// Set punctuation mode
+    pub async fn set_punctuation_mode(
+        &mut self,
+        scope: ClientScope,
+        mode: PunctuationMode,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::SetPunctuationMode(scope, mode)).await
+    }
+
+    /// Set spelling on or off
+    pub async fn set_spelling(&mut self, scope: ClientScope, value: bool) -> ClientResult<&mut Self> {
+        self.send(Request::SetSpelling(scope, value)).await
+    }
+
+    /// Set capital letters recognition mode
+    pub async fn set_capital_letter_recogn(
+        &mut self,
+        scope: ClientScope,
+        mode: CapitalLettersRecognitionMode,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::SetCapitalLettersRecognitionMode(scope, mode)).await
+    }
+
+    /// Set the voice type (MALE1, FEMALE1, …)
+    pub async fn set_voice_type(&mut self, scope: ClientScope, value: &str) -> ClientResult<&mut Self> {
+        self.send(Request::SetVoiceType(scope, value.to_string())).await
+    }
+
+    /// Get the current pre-defined voice
+    pub async fn get_voice_type(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::GetVoiceType).await
+    }
+
+    /// List the available symbolic voice names
+    pub async fn list_voice_types(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::ListVoiceTypes).await
+    }
+
+    /// Set the voice
+    pub async fn set_synthesis_voice(
+        &mut self,
+        scope: ClientScope,
+        value: &str,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::SetSynthesisVoice(scope, value.to_string())).await
+    }
+
+    /// Lists the available voices for the current synthesizer
+    pub async fn list_synthesis_voices(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::ListSynthesisVoices).await
+    }
+
+    /// Set the rate of speech. n is an integer value within the range from -100 to 100, lower values meaning slower speech.
+    pub async fn set_rate(&mut self, scope: ClientScope, value: i8) -> ClientResult<&mut Self> {
+        self.send(Request::SetRate(scope, value)).await
+    }
+
+    /// Get the current rate of speech.
+    pub async fn get_rate(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::GetRate).await
+    }
+
+    /// Set the pitch of speech. n is an integer value within the range from -100 to 100.
+    pub async fn set_pitch(&mut self, scope: ClientScope, value: i8) -> ClientResult<&mut Self> {
+        self.send(Request::SetPitch(scope, value)).await
+    }
+
+    /// Get the current pitch value.
+    pub async fn get_pitch(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::GetPitch).await
+    }
+
+    /// Set the volume of speech. n is an integer value within the range from -100 to 100.
+    pub async fn set_volume(&mut self, scope: ClientScope, value: i8) -> ClientResult<&mut Self> {
+        self.send(Request::SetVolume(scope, value)).await
+    }
+
+    /// Get the current volume.
+    pub async fn get_volume(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::GetVolume).await
+    }
+
+    /// Set the number of (more or less) sentences that should be repeated after a previously paused text is resumed.
+    pub async fn set_pause_context(&mut self, scope: ClientScope, value: u32) -> ClientResult<&mut Self> {
+        self.send(Request::SetPauseContext(scope, value)).await
+    }
+
+    /// Enable notification events
+    pub async fn set_notification(
+        &mut self,
+        ntype: NotificationType,
+        value: bool,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::SetNotification(ntype, value)).await
+    }
+
+    /// Open a block
+    pub async fn block_begin(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::Begin).await
+    }
+
+    /// End a block
+    pub async fn block_end(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::End).await
+    }
+
+    /// Enable or disable history of received messages.
+    pub async fn set_history(&mut self, scope: ClientScope, value: bool) -> ClientResult<&mut Self> {
+        self.send(Request::SetHistory(scope, value)).await
+    }
+
+    /// Get clients in history.
+    pub async fn history_get_clients(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryGetClients).await
+    }
+
+    /// Get client id in the history.
+    pub async fn history_get_client_id(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryGetClientId).await
+    }
+
+    /// Get last message said.
+    pub async fn history_get_last(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryGetLastMsgId).await
+    }
+
+    /// Get a range of client messages.
+    pub async fn history_get_client_messages(
+        &mut self,
+        scope: ClientScope,
+        start: u32,
+        number: u32,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryGetClientMsgs(scope, start, number)).await
+    }
+
+    /// Get the id of the last message sent by the client.
+    pub async fn history_get_last_message_id(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryGetLastMsgId).await
+    }
+
+    /// Return the text of an history message.
+    pub async fn history_get_message(&mut self, msg_id: MessageId) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryGetMsg(msg_id)).await
+    }
+
+    /// Get the id of the message the history cursor is pointing to.
+    pub async fn history_get_cursor(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryCursorGet).await
+    }
+
+    /// Set the history cursor position.
+    pub async fn history_set_cursor(
+        &mut self,
+        scope: ClientScope,
+        pos: HistoryPosition,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryCursorSet(scope, pos)).await
+    }
+
+    /// Move the cursor position backward or forward.
+    pub async fn history_move_cursor(&mut self, direction: CursorDirection) -> ClientResult<&mut Self> {
+        self.send(Request::HistoryCursorMove(direction)).await
+    }
+
+    /// Speak the message from history.
+    pub async fn history_speak(&mut self, msg_id: MessageId) -> ClientResult<&mut Self> {
+        self.send(Request::HistorySpeak(msg_id)).await
+    }
+
+    /// Sort messages in history.
+    pub async fn history_sort(
+        &mut self,
+        direction: SortDirection,
+        key: SortKey,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::HistorySort(direction, key)).await
+    }
+
+    /// Set the maximum length of short versions of history messages.
+    pub async fn history_set_short_message_length(&mut self, length: u32) -> ClientResult<&mut Self> {
+        self.send(Request::HistorySetShortMsgLength(length)).await
+    }
+
+    /// Set the ordering of the message types, from the minimum to the maximum.
+    pub async fn history_set_ordering(&mut self, ordering: Vec<Ordering>) -> ClientResult<&mut Self> {
+        self.send(Request::HistorySetMsgTypeOrdering(ordering)).await
+    }
+
+    /// Search in message history.
+    pub async fn history_search(
+        &mut self,
+        scope: ClientScope,
+        condition: &str,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::HistorySearch(scope, condition.to_string())).await
+    }
+
+    /// Close the connection
+    pub async fn quit(&mut self) -> ClientResult<&mut Self> {
+        self.send(Request::Quit).await
+    }
+
+    /// Check status of answer, discard lines.
+    pub async fn check_status(&mut self, expected_code: ReturnCode) -> ClientResult<&mut Self> {
+        self.receive_answer(None).await.and_then(|status| {
+            if status.code == expected_code {
+                Ok(self)
+            } else {
+                Err(ClientError::UnexpectedStatus(status.code))
+            }
+        })
+    }
+
+    /// Receive lines
+    pub async fn receive_lines(&mut self, expected_code: ReturnCode) -> ClientResult<Vec<String>> {
+        let mut lines = Vec::new();
+        let status = self.receive_answer(Some(&mut lines)).await?;
+        if status.code == expected_code {
+            Ok(lines)
+        } else {
+            Err(ClientError::UnexpectedStatus(status.code))
+        }
+    }
+
+    /// Receive a single string
+    pub async fn receive_string(&mut self, expected_code: ReturnCode) -> ClientResult<String> {
+        self.receive_lines(expected_code)
+            .await.and_then(|lines| parse_single_value(&lines))
+    }
+
+    /// Receive signed 8-bit integer
+    pub async fn receive_i8(&mut self) -> ClientResult<u8> {
+        self.receive_string(OK_GET).await.and_then(|s| {
+            s.parse()
+                .map_err(|_| ClientError::invalid_data("invalid signed integer"))
+        })
+    }
+
+    /// Receive unsigned 8-bit integer
+    pub async fn receive_u8(&mut self) -> ClientResult<u8> {
+        self.receive_string(OK_GET).await.and_then(|s| {
+            s.parse()
+                .map_err(|_| ClientError::invalid_data("invalid unsigned 8-bit integer"))
+        })
+    }
+
+    /// Receive cursor pos
+    pub async fn receive_cursor_pos(&mut self) -> ClientResult<u16> {
+        self.receive_string(OK_CUR_POS_RET).await.and_then(|s| {
+            s.parse()
+                .map_err(|_| ClientError::invalid_data("invalid unsigned 16-bit integer"))
+        })
+    }
+
+    /// Receive message id
+    pub async fn receive_message_id(&mut self) -> ClientResult<MessageId> {
+        let mut lines = Vec::new();
+        match self.receive_answer(Some(&mut lines)).await?.code {
+            OK_MESSAGE_QUEUED | OK_LAST_MSG => Ok(parse_single_integer(&lines)?),
+            _ => Err(ClientError::invalid_data("not a message id")),
+        }
+    }
+
+    /// Receive client id
+    pub async fn receive_client_id(&mut self) -> ClientResult<ClientId> {
+        self.receive_string(OK_CLIENT_ID_SENT).await.and_then(|s| {
+            s.parse()
+                .map_err(|_| ClientError::invalid_data("invalid client id"))
+        })
+    }
+
+    /// Receive a list of synthesis voices
+    pub async fn receive_synthesis_voices(&mut self) -> ClientResult<Vec<SynthesisVoice>> {
+        self.receive_lines(OK_VOICES_LIST_SENT)
+            .await.and_then(|lines| parse_typed_lines::<SynthesisVoice>(&lines))
+    }
+
+    /// Receive a notification
+    pub async fn receive_event(&mut self) -> ClientResult<Event> {
+        let mut lines = Vec::new();
+        self.receive_answer(Some(&mut lines)).await.and_then(|status| {
+            if lines.len() < 2 {
+                Err(ClientError::unexpected_eof("event truncated"))
+            } else {
+                let message = &lines[0];
+                let client = &lines[1];
+                match status.code {
+                    700 => {
+                        if lines.len() != 3 {
+                            Err(ClientError::unexpected_eof("index markevent truncated"))
+                        } else {
+                            let mark = lines[3].to_owned();
+                            Ok(Event::index_mark(mark, message, client))
+                        }
+                    }
+                    701 => Ok(Event::begin(message, client)),
+                    702 => Ok(Event::end(message, client)),
+                    703 => Ok(Event::cancel(message, client)),
+                    704 => Ok(Event::pause(message, client)),
+                    705 => Ok(Event::resume(message, client)),
+                    _ => Err(ClientError::invalid_data("wrong status code for event")),
+                }
+            }
+        })
+    }
+
+    /// Receive a list of client status from history.
+    pub async fn receive_history_clients(&mut self) -> ClientResult<Vec<HistoryClientStatus>> {
+        self.receive_lines(OK_CLIENTS_LIST_SENT)
+            .await.and_then(|lines| parse_typed_lines::<HistoryClientStatus>(&lines))
+    }
+
+    /// Check the result of `set_client_name`.
+    pub async fn check_client_name_set(&mut self) -> ClientResult<&mut Self> {
+        self.check_status(OK_CLIENT_NAME_SET).await
+    }
+
+    /// Check if server accept data.
+    pub async fn check_receiving_data(&mut self) -> ClientResult<&mut Self> {
+        self.check_status(OK_RECEIVING_DATA).await
+    }
+}
