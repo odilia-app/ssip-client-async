@@ -189,10 +189,8 @@ pub mod asynchronous_tokio {
         }
 
         pub async fn build(&self) -> io::Result<AsyncClient<AsyncBufReader<OwnedReadHalf>, AsyncBufWriter<OwnedWriteHalf>>> {
-            println!("Attempting build!");
             let (read_stream, write_stream) = UnixStream::connect(self.path.get()?).await?
               .into_split();
-            println!("Read and write streams built.");
             Ok(AsyncClient::new(
                 AsyncBufReader::new(read_stream),
                 AsyncBufWriter::new(write_stream),
