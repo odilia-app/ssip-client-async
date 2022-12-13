@@ -30,7 +30,7 @@
 mod protocol;
 
 mod poll;
-mod types;
+pub mod types;
 
 pub mod client;
 pub mod constants;
