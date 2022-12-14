@@ -341,7 +341,7 @@ impl Event {
 }
 
 /// Synthesis voice
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct SynthesisVoice {
     pub name: String,
     pub language: Option<String>,
@@ -391,7 +391,7 @@ impl FromStr for SynthesisVoice {
 /// Examples:
 /// - 216 OK OUTPUT MODULE SET
 /// - 409 ERR RATE TOO HIGH
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct StatusLine {
     pub code: ReturnCode,
     pub message: String,
@@ -539,7 +539,7 @@ impl fmt::Display for HistoryPosition {
 }
 
 /// History client status
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct HistoryClientStatus {
     pub id: ClientId,
     pub name: String,

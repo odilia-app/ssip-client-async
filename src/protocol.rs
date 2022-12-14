@@ -10,12 +10,12 @@
 use log::debug;
 use std::io::{self, BufRead, Write};
 
-#[cfg(feature = "tokio")]
+#[cfg(any(feature = "tokio", doc))]
 use tokio::io::{
     AsyncWrite, AsyncWriteExt,
     AsyncBufRead, AsyncBufReadExt,
 };
-#[cfg(feature = "async-std")]
+#[cfg(any(feature = "async-std", doc))]
 use async_std::io::{
   Read as AsyncReadStd,
   BufRead as AsyncBufReadStd,
@@ -90,7 +90,7 @@ pub(crate) fn write_lines(output: &mut dyn Write, lines: &[&str]) -> ClientResul
 }
 
 /// Write lines (asyncronously) separated by CRLF.
-#[cfg(feature = "tokio")]
+#[cfg(any(feature = "tokio", doc))]
 pub(crate) async fn write_lines_tokio(output: &mut (dyn AsyncWrite + Unpin), lines: &[&str]) -> ClientResult<()> {
     for line in lines.iter() {
         debug!("SSIP(out): {}", line);
@@ -100,7 +100,7 @@ pub(crate) async fn write_lines_tokio(output: &mut (dyn AsyncWrite + Unpin), lin
     Ok(())
 }
 /// Write lines (asyncronously) separated by CRLF.
-#[cfg(feature = "async-std")]
+#[cfg(any(feature = "async-std", doc))]
 pub(crate) async fn write_lines_async_std(output: &mut (dyn AsyncWriteStd + Unpin), lines: &[&str]) -> ClientResult<()> {
     for line in lines.iter() {
         debug!("SSIP(out): {}", line);
@@ -117,14 +117,14 @@ pub(crate) fn flush_lines(output: &mut dyn Write, lines: &[&str]) -> ClientResul
     Ok(())
 }
 /// Write lines separated by CRLF and flush the output asyncronously.
-#[cfg(feature = "tokio")]
+#[cfg(any(feature = "tokio", doc))]
 pub(crate) async fn flush_lines_tokio(output: &mut (dyn AsyncWrite + Unpin), lines: &[&str]) -> ClientResult<()> {
     write_lines_tokio(output, lines).await?;
     output.flush().await?;
     Ok(())
 }
 /// Write lines separated by CRLF and flush the output asyncronously.
-#[cfg(feature = "async-std")]
+#[cfg(any(feature = "async-std", doc))]
 pub(crate) async fn flush_lines_async_std(output: &mut (dyn AsyncWriteStd + Unpin), lines: &[&str]) -> ClientResult<()> {
     write_lines_async_std(output, lines).await?;
     output.flush().await?;
@@ -150,7 +150,7 @@ fn parse_status_line(code: u16, line: &str) -> ClientStatus {
 }
 
 /// Read lines from server until a status line is found.
-#[cfg(feature = "tokio")]
+#[cfg(any(feature = "tokio", doc))]
 pub(crate) async fn receive_answer_tokio(
     input: &mut (dyn AsyncBufRead + Unpin),
     mut lines: Option<&mut Vec<String>>,
@@ -179,7 +179,7 @@ pub(crate) async fn receive_answer_tokio(
     }
 }
 /// Read lines from server until a status line is found.
-#[cfg(feature = "async-std")]
+#[cfg(any(feature = "async-std", doc))]
 pub(crate) async fn receive_answer_async_std(
     input: &mut (dyn AsyncBufReadStd + Unpin),
     mut lines: Option<&mut Vec<String>>,

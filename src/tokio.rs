@@ -1,5 +1,3 @@
-#[cfg(all(feature = "tokio"))]
-
 // ssip-client -- Speech Dispatcher client in Rust
 // Copyright (c) 2021-2022 Laurent Pelecq
 //
@@ -177,8 +175,8 @@ pub enum Response {
 /// SSIP client on generic async stream
 ///
 /// There are two ways to send requests and receive responses:
-/// * Either with the generic [`Client::send`] and [`Client::receive`]
-/// * Or with the specific methods such as [`Client::set_rate`], ..., [`Client::get_rate`], ...
+/// * Either with the generic [`AsyncClient::send`] and [`AsyncClient::receive`]
+/// * Or with the specific methods such as [`AsyncClient::set_rate`], ..., [`AsyncClient::get_rate`], ...
 pub struct AsyncClient<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> {
     input: R,
     output: W,
