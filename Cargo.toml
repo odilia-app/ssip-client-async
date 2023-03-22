@@ -1,6 +1,6 @@
 [package]
 name = "ssip-client-async"
-version = "0.9.0"
+version = "0.10.0"
 authors = ["Laurent Pelecq <lpelecq+rust@circoise.eu>", "Tait Hoyem <tait@tait.tech>"]
 edition = "2021"
 description = "Client API for Speech Dispatcher"
@@ -16,8 +16,8 @@ mio = { version = "0.8", optional = true }
 thiserror = "1"
 strum = "0.24"
 strum_macros = "0.24"
-tokio = { version = "^1.21.2", features = ["io-util", "rt", "macros", "net"], optional = true }
-async-std = { version = "1.12.0", default_features = true, optional = true }
+tokio = { version = "^1.21.2", features = ["io-util", "rt", "macros", "net"] }
+async-std = { version = "1.12.0", default_features = true }
 
 [features]
 async-mio = ["mio/net", "mio/os-poll"]
