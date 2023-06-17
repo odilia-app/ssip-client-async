@@ -1,0 +1,12 @@
+[package]
+name = "ssip-common"
+version = "0.1.0"
+edition = "2021"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+strum = "0.24.1"
+strum_macros = "0.24"
+thiserror = "1.0.40"
