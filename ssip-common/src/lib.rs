@@ -421,17 +421,17 @@ pub enum ClientError {
 
 impl ClientError {
     /// Create I/O error
-    pub(crate) fn io_error(kind: io::ErrorKind, msg: &str) -> Self {
+    pub fn io_error(kind: io::ErrorKind, msg: &str) -> Self {
         Self::Io(io::Error::new(kind, msg))
     }
 
     /// Invalid data I/O error
-    pub(crate) fn invalid_data(msg: &str) -> Self {
+    pub fn invalid_data(msg: &str) -> Self {
         ClientError::io_error(io::ErrorKind::InvalidData, msg)
     }
 
     /// Unexpected EOF I/O error
-    pub(crate) fn unexpected_eof(msg: &str) -> Self {
+    pub fn unexpected_eof(msg: &str) -> Self {
         ClientError::io_error(io::ErrorKind::UnexpectedEof, msg)
     }
 }
