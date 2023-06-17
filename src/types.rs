@@ -24,7 +24,7 @@ pub type MessageId = u32;
 pub type ClientId = u32;
 
 /// Message identifiers
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MessageScope {
     /// Last message from current client
     Last,
@@ -45,7 +45,7 @@ impl fmt::Display for MessageScope {
 }
 
 /// Client identifiers
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum ClientScope {
     /// Current client
     Current,
@@ -66,7 +66,7 @@ impl fmt::Display for ClientScope {
 }
 
 /// Priority
-#[derive(StrumDisplay, Debug, Clone)]
+#[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Priority {
     #[strum(serialize = "progress")]
     Progress,
@@ -81,7 +81,7 @@ pub enum Priority {
 }
 
 /// Punctuation mode.
-#[derive(StrumDisplay, Debug, Clone)]
+#[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PunctuationMode {
     #[strum(serialize = "none")]
     None,
@@ -94,7 +94,7 @@ pub enum PunctuationMode {
 }
 
 /// Capital letters recognition mode.
-#[derive(StrumDisplay, Debug, Clone)]
+#[derive(StrumDisplay, Debug, Clone, Hash, Eq, PartialEq)]
 pub enum CapitalLettersRecognitionMode {
     #[strum(serialize = "none")]
     None,
@@ -105,7 +105,7 @@ pub enum CapitalLettersRecognitionMode {
 }
 
 /// Symbolic key names
-#[derive(StrumDisplay, Debug, Clone)]
+#[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum KeyName {
     #[strum(serialize = "space")]
     Space,
@@ -252,7 +252,7 @@ pub enum KeyName {
 }
 
 /// Notification type
-#[derive(StrumDisplay, Debug, Clone)]
+#[derive(StrumDisplay, Debug, Clone, Hash, Eq, PartialEq)]
 pub enum NotificationType {
     #[strum(serialize = "begin")]
     Begin,
@@ -282,7 +282,7 @@ pub enum EventType {
 }
 
 /// Event identifier
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct EventId {
     // Message id
     pub message: String,
@@ -341,7 +341,7 @@ impl Event {
 }
 
 /// Synthesis voice
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct SynthesisVoice {
     pub name: String,
     pub language: Option<String>,
@@ -453,7 +453,7 @@ pub type ClientResult<T> = Result<T, ClientError>;
 pub type ClientStatus = ClientResult<StatusLine>;
 
 /// Client name
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ClientName {
     pub user: String,
     pub application: String,
@@ -475,7 +475,7 @@ impl ClientName {
 }
 
 /// Cursor motion in history
-#[derive(StrumDisplay, Debug, Clone)]
+#[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CursorDirection {
     #[strum(serialize = "backward")]
     Backward,
@@ -484,7 +484,7 @@ pub enum CursorDirection {
 }
 
 /// Sort direction in history
-#[derive(StrumDisplay, Debug, Clone)]
+#[derive(StrumDisplay, Debug, Clone, Eq, PartialEq, Hash)]
 pub enum SortDirection {
     #[strum(serialize = "asc")]
     Ascending,
@@ -493,7 +493,7 @@ pub enum SortDirection {
 }
 
 /// Property messages are ordered by in history
-#[derive(StrumDisplay, Debug, Clone)]
+#[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SortKey {
     #[strum(serialize = "client_name")]
     ClientName,
@@ -508,7 +508,7 @@ pub enum SortKey {
 }
 
 /// Sort ordering
-#[derive(StrumDisplay, Debug, Clone)]
+#[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Ordering {
     #[strum(serialize = "text")]
     Text,
@@ -521,7 +521,7 @@ pub enum Ordering {
 }
 
 /// Position in history
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum HistoryPosition {
     First,
     Last,
@@ -539,7 +539,7 @@ impl fmt::Display for HistoryPosition {
 }
 
 /// History client status
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct HistoryClientStatus {
     pub id: ClientId,
     pub name: String,
@@ -582,6 +582,124 @@ impl FromStr for HistoryClientStatus {
             None => Err(ClientError::unexpected_eof("expecting client id")),
         }
     }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+/// Request for SSIP server.
+pub enum Request {
+    SetName(ClientName),
+    // Speech related requests
+    Speak,
+    SendLine(String),
+    SendLines(Vec<String>),
+    SpeakChar(char),
+    SpeakKey(KeyName),
+    // Flow control
+    Stop(MessageScope),
+    Cancel(MessageScope),
+    Pause(MessageScope),
+    Resume(MessageScope),
+    // Setter and getter
+    SetPriority(Priority),
+    SetDebug(bool),
+    SetOutputModule(ClientScope, String),
+    GetOutputModule,
+    ListOutputModules,
+    SetLanguage(ClientScope, String),
+    GetLanguage,
+    SetSsmlMode(bool),
+    SetPunctuationMode(ClientScope, PunctuationMode),
+    SetSpelling(ClientScope, bool),
+    SetCapitalLettersRecognitionMode(ClientScope, CapitalLettersRecognitionMode),
+    SetVoiceType(ClientScope, String),
+    GetVoiceType,
+    ListVoiceTypes,
+    SetSynthesisVoice(ClientScope, String),
+    ListSynthesisVoices,
+    SetRate(ClientScope, i8),
+    GetRate,
+    SetPitch(ClientScope, i8),
+    GetPitch,
+    SetVolume(ClientScope, i8),
+    GetVolume,
+    SetPauseContext(ClientScope, u32),
+    SetNotification(NotificationType, bool),
+    // Blocks
+    Begin,
+    End,
+    // History
+    SetHistory(ClientScope, bool),
+    HistoryGetClients,
+    HistoryGetClientId,
+    HistoryGetClientMsgs(ClientScope, u32, u32),
+    HistoryGetLastMsgId,
+    HistoryGetMsg(MessageId),
+    HistoryCursorGet,
+    HistoryCursorSet(ClientScope, HistoryPosition),
+    HistoryCursorMove(CursorDirection),
+    HistorySpeak(MessageId),
+    HistorySort(SortDirection, SortKey),
+    HistorySetShortMsgLength(u32),
+    HistorySetMsgTypeOrdering(Vec<Ordering>),
+    HistorySearch(ClientScope, String),
+    // Misc.
+    Quit,
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+/// Response from SSIP server.
+pub enum Response {
+    LanguageSet,                                     // 201
+    PrioritySet,                                     // 202
+    RateSet,                                         // 203
+    PitchSet,                                        // 204
+    PunctuationSet,                                  // 205
+    CapLetRecognSet,                                 // 206
+    SpellingSet,                                     // 207
+    ClientNameSet,                                   // 208
+    VoiceSet,                                        // 209
+    Stopped,                                         // 210
+    Paused,                                          // 211
+    Resumed,                                         // 212
+    Canceled,                                        // 213
+    TableSet,                                        // 215
+    OutputModuleSet,                                 // 216
+    PauseContextSet,                                 // 217
+    VolumeSet,                                       // 218
+    SsmlModeSet,                                     // 219
+    NotificationSet,                                 // 220
+    PitchRangeSet,                                   // 263
+    DebugSet,                                        // 262
+    HistoryCurSetFirst,                              // 220
+    HistoryCurSetLast,                               // 221
+    HistoryCurSetPos,                                // 222
+    HistoryCurMoveFor,                               // 223
+    HistoryCurMoveBack,                              // 224
+    MessageQueued,                                   // 225,
+    SoundIconQueued,                                 // 226
+    MessageCanceled,                                 // 227
+    ReceivingData,                                   // 230
+    Bye,                                             // 231
+    HistoryClientListSent(Vec<HistoryClientStatus>), // 240
+    HistoryMsgsListSent(Vec<String>),                // 241
+    HistoryLastMsg(String),                          // 242
+    HistoryCurPosRet(String),                        // 243
+    TableListSent(Vec<String>),                      // 244
+    HistoryClientIdSent(ClientId),                   // 245
+    MessageTextSent,                                 // 246
+    HelpSent(Vec<String>),                           // 248
+    VoicesListSent(Vec<SynthesisVoice>),             // 249
+    OutputModulesListSent(Vec<String>),              // 250
+    Get(String),                                     // 251
+    InsideBlock,                                     // 260
+    OutsideBlock,                                    // 261
+    NotImplemented,                                  // 299
+    EventIndexMark(EventId, String),                 // 700
+    EventBegin(EventId),                             // 701
+    EventEnd(EventId),                               // 702
+    EventCanceled(EventId),                          // 703
+    EventPaused(EventId),                            // 704
+    EventResumed(EventId),                           // 705
 }
 
 #[cfg(test)]

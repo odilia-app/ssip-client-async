@@ -47,7 +47,6 @@ pub mod tokio;
 #[cfg(any(feature = "async-std", doc))]
 pub mod async_std;
 
-pub use client::{Request, Response};
 pub use constants::*;
 pub use poll::QueuedClient;
 pub use types::*;
