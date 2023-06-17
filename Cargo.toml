@@ -10,6 +10,7 @@ repository = "https://github.com/odilia-app/ssip-client-async/"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ssip-common = { version = "0.1.0", path = "ssip-common" }
 dirs = "4"
 log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
 mio = { version = "0.8", optional = true }
