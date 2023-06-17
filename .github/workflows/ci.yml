@@ -32,7 +32,8 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-          target: ${{ matrix.target }}
+      - name: Install Toolchain
+        run: rustup target add ${{ matrix.target }}
       - name: Run tests
         working-directory: ssip-common
         run: cargo test
