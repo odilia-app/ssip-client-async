@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 readme = "README.md"
 description = "Common data types used for clients and servers using the SSIP protocol."
-license = "Apache-2.0 or MIT"
+license = "Apache-2.0 OR MIT"
 repository = "https://github.com/odilia-app/ssip-client-async/"
 homepage = "http://htmlpreview.github.io/?https://github.com/brailcom/speechd/blob/master/doc/ssip.html"
 
