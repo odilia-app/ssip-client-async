@@ -1,6 +1,6 @@
 [package]
 name = "ssip-client-async"
-version = "0.11.0"
+version = "0.12.0"
 authors = ["Laurent Pelecq <lpelecq+rust@circoise.eu>", "Tait Hoyem <tait@tait.tech>"]
 edition = "2021"
 description = "Client API for Speech Dispatcher"
