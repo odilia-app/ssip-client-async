@@ -11,8 +11,8 @@ use std::io::{self, Read, Write};
 
 use crate::constants::*;
 use crate::protocol::{
-    flush_lines, parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines,
-    flush_lines_async_std, write_lines_async_std,
+    flush_lines, flush_lines_async_std, parse_event_id, parse_single_integer, parse_single_value,
+    parse_typed_lines, write_lines_async_std,
 };
 use crate::types::*;
 
@@ -79,7 +79,8 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
                 .map(|s| s.as_str())
                 .collect::<Vec<&str>>()
                 .as_slice(),
-        ).await?;
+        )
+        .await?;
         flush_lines_async_std(&mut self.output, &END_OF_DATA).await?;
         Ok(self)
     }
@@ -333,7 +334,8 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
         scope: ClientScope,
         value: &str,
     ) -> ClientResult<&mut Self> {
-        self.send(Request::SetOutputModule(scope, value.to_string())).await
+        self.send(Request::SetOutputModule(scope, value.to_string()))
+            .await
     }
 
     /// Get the current output module
@@ -347,8 +349,13 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     }
 
     /// Set language code
-    pub async fn set_language(&mut self, scope: ClientScope, value: &str) -> ClientResult<&mut Self> {
-        self.send(Request::SetLanguage(scope, value.to_string())).await
+    pub async fn set_language(
+        &mut self,
+        scope: ClientScope,
+        value: &str,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::SetLanguage(scope, value.to_string()))
+            .await
     }
 
     /// Get the current language
@@ -371,7 +378,11 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     }
 
     /// Set spelling on or off
-    pub async fn set_spelling(&mut self, scope: ClientScope, value: bool) -> ClientResult<&mut Self> {
+    pub async fn set_spelling(
+        &mut self,
+        scope: ClientScope,
+        value: bool,
+    ) -> ClientResult<&mut Self> {
         self.send(Request::SetSpelling(scope, value)).await
     }
 
@@ -381,12 +392,18 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
         scope: ClientScope,
         mode: CapitalLettersRecognitionMode,
     ) -> ClientResult<&mut Self> {
-        self.send(Request::SetCapitalLettersRecognitionMode(scope, mode)).await
+        self.send(Request::SetCapitalLettersRecognitionMode(scope, mode))
+            .await
     }
 
     /// Set the voice type (MALE1, FEMALE1, …)
-    pub async fn set_voice_type(&mut self, scope: ClientScope, value: &str) -> ClientResult<&mut Self> {
-        self.send(Request::SetVoiceType(scope, value.to_string())).await
+    pub async fn set_voice_type(
+        &mut self,
+        scope: ClientScope,
+        value: &str,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::SetVoiceType(scope, value.to_string()))
+            .await
     }
 
     /// Get the current pre-defined voice
@@ -405,7 +422,8 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
         scope: ClientScope,
         value: &str,
     ) -> ClientResult<&mut Self> {
-        self.send(Request::SetSynthesisVoice(scope, value.to_string())).await
+        self.send(Request::SetSynthesisVoice(scope, value.to_string()))
+            .await
     }
 
     /// Lists the available voices for the current synthesizer
@@ -444,7 +462,11 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     }
 
     /// Set the number of (more or less) sentences that should be repeated after a previously paused text is resumed.
-    pub async fn set_pause_context(&mut self, scope: ClientScope, value: u32) -> ClientResult<&mut Self> {
+    pub async fn set_pause_context(
+        &mut self,
+        scope: ClientScope,
+        value: u32,
+    ) -> ClientResult<&mut Self> {
         self.send(Request::SetPauseContext(scope, value)).await
     }
 
@@ -468,7 +490,11 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     }
 
     /// Enable or disable history of received messages.
-    pub async fn set_history(&mut self, scope: ClientScope, value: bool) -> ClientResult<&mut Self> {
+    pub async fn set_history(
+        &mut self,
+        scope: ClientScope,
+        value: bool,
+    ) -> ClientResult<&mut Self> {
         self.send(Request::SetHistory(scope, value)).await
     }
 
@@ -494,7 +520,8 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
         start: u32,
         number: u32,
     ) -> ClientResult<&mut Self> {
-        self.send(Request::HistoryGetClientMsgs(scope, start, number)).await
+        self.send(Request::HistoryGetClientMsgs(scope, start, number))
+            .await
     }
 
     /// Get the id of the last message sent by the client.
@@ -522,7 +549,10 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     }
 
     /// Move the cursor position backward or forward.
-    pub async fn history_move_cursor(&mut self, direction: CursorDirection) -> ClientResult<&mut Self> {
+    pub async fn history_move_cursor(
+        &mut self,
+        direction: CursorDirection,
+    ) -> ClientResult<&mut Self> {
         self.send(Request::HistoryCursorMove(direction)).await
     }
 
@@ -541,13 +571,20 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     }
 
     /// Set the maximum length of short versions of history messages.
-    pub async fn history_set_short_message_length(&mut self, length: u32) -> ClientResult<&mut Self> {
+    pub async fn history_set_short_message_length(
+        &mut self,
+        length: u32,
+    ) -> ClientResult<&mut Self> {
         self.send(Request::HistorySetShortMsgLength(length)).await
     }
 
     /// Set the ordering of the message types, from the minimum to the maximum.
-    pub async fn history_set_ordering(&mut self, ordering: Vec<Ordering>) -> ClientResult<&mut Self> {
-        self.send(Request::HistorySetMsgTypeOrdering(ordering)).await
+    pub async fn history_set_ordering(
+        &mut self,
+        ordering: Vec<Ordering>,
+    ) -> ClientResult<&mut Self> {
+        self.send(Request::HistorySetMsgTypeOrdering(ordering))
+            .await
     }
 
     /// Search in message history.
@@ -556,7 +593,8 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
         scope: ClientScope,
         condition: &str,
     ) -> ClientResult<&mut Self> {
-        self.send(Request::HistorySearch(scope, condition.to_string())).await
+        self.send(Request::HistorySearch(scope, condition.to_string()))
+            .await
     }
 
     /// Close the connection
@@ -589,7 +627,8 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     /// Receive a single string
     pub async fn receive_string(&mut self, expected_code: ReturnCode) -> ClientResult<String> {
         self.receive_lines(expected_code)
-            .await.and_then(|lines| parse_single_value(&lines))
+            .await
+            .and_then(|lines| parse_single_value(&lines))
     }
 
     /// Receive signed 8-bit integer
@@ -636,42 +675,46 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     /// Receive a list of synthesis voices
     pub async fn receive_synthesis_voices(&mut self) -> ClientResult<Vec<SynthesisVoice>> {
         self.receive_lines(OK_VOICES_LIST_SENT)
-            .await.and_then(|lines| parse_typed_lines::<SynthesisVoice>(&lines))
+            .await
+            .and_then(|lines| parse_typed_lines::<SynthesisVoice>(&lines))
     }
 
     /// Receive a notification
     pub async fn receive_event(&mut self) -> ClientResult<Event> {
         let mut lines = Vec::new();
-        self.receive_answer(Some(&mut lines)).await.and_then(|status| {
-            if lines.len() < 2 {
-                Err(ClientError::unexpected_eof("event truncated"))
-            } else {
-                let message = &lines[0];
-                let client = &lines[1];
-                match status.code {
-                    700 => {
-                        if lines.len() != 3 {
-                            Err(ClientError::unexpected_eof("index markevent truncated"))
-                        } else {
-                            let mark = lines[3].to_owned();
-                            Ok(Event::index_mark(mark, message, client))
+        self.receive_answer(Some(&mut lines))
+            .await
+            .and_then(|status| {
+                if lines.len() < 2 {
+                    Err(ClientError::unexpected_eof("event truncated"))
+                } else {
+                    let message = &lines[0];
+                    let client = &lines[1];
+                    match status.code {
+                        700 => {
+                            if lines.len() != 3 {
+                                Err(ClientError::unexpected_eof("index markevent truncated"))
+                            } else {
+                                let mark = lines[3].to_owned();
+                                Ok(Event::index_mark(mark, message, client))
+                            }
                         }
+                        701 => Ok(Event::begin(message, client)),
+                        702 => Ok(Event::end(message, client)),
+                        703 => Ok(Event::cancel(message, client)),
+                        704 => Ok(Event::pause(message, client)),
+                        705 => Ok(Event::resume(message, client)),
+                        _ => Err(ClientError::invalid_data("wrong status code for event")),
                     }
-                    701 => Ok(Event::begin(message, client)),
-                    702 => Ok(Event::end(message, client)),
-                    703 => Ok(Event::cancel(message, client)),
-                    704 => Ok(Event::pause(message, client)),
-                    705 => Ok(Event::resume(message, client)),
-                    _ => Err(ClientError::invalid_data("wrong status code for event")),
                 }
-            }
-        })
+            })
     }
 
     /// Receive a list of client status from history.
     pub async fn receive_history_clients(&mut self) -> ClientResult<Vec<HistoryClientStatus>> {
         self.receive_lines(OK_CLIENTS_LIST_SENT)
-            .await.and_then(|lines| parse_typed_lines::<HistoryClientStatus>(&lines))
+            .await
+            .and_then(|lines| parse_typed_lines::<HistoryClientStatus>(&lines))
     }
 
     /// Check the result of `set_client_name`.

@@ -10,20 +10,13 @@
 use log::debug;
 use std::io::{self, BufRead, Write};
 
-#[cfg(any(feature = "tokio", doc))]
-use tokio::io::{
-    AsyncWrite, AsyncWriteExt,
-    AsyncBufRead, AsyncBufReadExt,
-};
 #[cfg(any(feature = "async-std", doc))]
 use async_std::io::{
-  Read as AsyncReadStd,
-  BufRead as AsyncBufReadStd,
-  Write as AsyncWriteStd,
-  ReadExt,
-  WriteExt,
-  prelude::BufReadExt,
+    prelude::BufReadExt, BufRead as AsyncBufReadStd, Read as AsyncReadStd, ReadExt,
+    Write as AsyncWriteStd, WriteExt,
 };
+#[cfg(any(feature = "tokio", doc))]
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt};
 
 use std::str::FromStr;
 
@@ -91,7 +84,10 @@ pub(crate) fn write_lines<W: Write + ?Sized>(output: &mut W, lines: &[&str]) -> 
 
 /// Write lines (asyncronously) separated by CRLF.
 #[cfg(any(feature = "tokio", doc))]
-pub(crate) async fn write_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(output: &mut W, lines: &[&str]) -> ClientResult<()> {
+pub(crate) async fn write_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
+    output: &mut W,
+    lines: &[&str],
+) -> ClientResult<()> {
     for line in lines.iter() {
         debug!("SSIP(out): {}", line);
         output.write_all(line.as_bytes()).await?;
@@ -101,7 +97,10 @@ pub(crate) async fn write_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(output: &m
 }
 /// Write lines (asyncronously) separated by CRLF.
 #[cfg(any(feature = "async-std", doc))]
-pub(crate) async fn write_lines_async_std<W: AsyncWriteStd + Unpin + ?Sized>(output: &mut W, lines: &[&str]) -> ClientResult<()> {
+pub(crate) async fn write_lines_async_std<W: AsyncWriteStd + Unpin + ?Sized>(
+    output: &mut W,
+    lines: &[&str],
+) -> ClientResult<()> {
     for line in lines.iter() {
         debug!("SSIP(out): {}", line);
         output.write_all(line.as_bytes()).await?;
@@ -118,14 +117,20 @@ pub(crate) fn flush_lines<W: Write + ?Sized>(output: &mut W, lines: &[&str]) -> 
 }
 /// Write lines separated by CRLF and flush the output asyncronously.
 #[cfg(any(feature = "tokio", doc))]
-pub(crate) async fn flush_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(output: &mut W, lines: &[&str]) -> ClientResult<()> {
+pub(crate) async fn flush_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
+    output: &mut W,
+    lines: &[&str],
+) -> ClientResult<()> {
     write_lines_tokio(output, lines).await?;
     output.flush().await?;
     Ok(())
 }
 /// Write lines separated by CRLF and flush the output asyncronously.
 #[cfg(any(feature = "async-std", doc))]
-pub(crate) async fn flush_lines_async_std<W: AsyncWriteStd + Unpin + ?Sized>(output: &mut W, lines: &[&str]) -> ClientResult<()> {
+pub(crate) async fn flush_lines_async_std<W: AsyncWriteStd + Unpin + ?Sized>(
+    output: &mut W,
+    lines: &[&str],
+) -> ClientResult<()> {
     write_lines_async_std(output, lines).await?;
     output.flush().await?;
     Ok(())

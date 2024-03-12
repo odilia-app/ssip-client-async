@@ -157,13 +157,9 @@ mod asynchronous {
 }
 #[cfg(feature = "tokio")]
 pub mod asynchronous_tokio {
-    pub use tokio::net::{
-      UnixStream,
-      unix::OwnedReadHalf,
-      unix::OwnedWriteHalf,
-    };
-    use tokio::io::{self, BufReader as AsyncBufReader, BufWriter as AsyncBufWriter};
     use std::path::Path;
+    use tokio::io::{self, BufReader as AsyncBufReader, BufWriter as AsyncBufWriter};
+    pub use tokio::net::{unix::OwnedReadHalf, unix::OwnedWriteHalf, UnixStream};
 
     use crate::tokio::AsyncClient;
 
@@ -188,9 +184,12 @@ pub mod asynchronous_tokio {
             self
         }
 
-        pub async fn build(&self) -> io::Result<AsyncClient<AsyncBufReader<OwnedReadHalf>, AsyncBufWriter<OwnedWriteHalf>>> {
-            let (read_stream, write_stream) = UnixStream::connect(self.path.get()?).await?
-              .into_split();
+        pub async fn build(
+            &self,
+        ) -> io::Result<AsyncClient<AsyncBufReader<OwnedReadHalf>, AsyncBufWriter<OwnedWriteHalf>>>
+        {
+            let (read_stream, write_stream) =
+                UnixStream::connect(self.path.get()?).await?.into_split();
             Ok(AsyncClient::new(
                 AsyncBufReader::new(read_stream),
                 AsyncBufWriter::new(write_stream),

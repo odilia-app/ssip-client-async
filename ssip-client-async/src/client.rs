@@ -12,7 +12,7 @@ use std::io::{self, Read, Write};
 use crate::constants::*;
 use crate::protocol::{
     flush_lines, parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines,
-    write_lines
+    write_lines,
 };
 use crate::types::*;
 
