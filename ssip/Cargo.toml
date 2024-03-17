@@ -7,6 +7,11 @@ description = "A set of types for representing SSIP requests and responses."
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/odilia-app/ssip-client-async/"
 homepage = "http://htmlpreview.github.io/?https://github.com/brailcom/speechd/blob/master/doc/ssip.html"
+authors = [
+	"Tait Hoyem <tait@tait.tech>",
+	"Laurent Pelecq <lpelecq+rust@circoise.eu",
+]
+keywords = ["ssip", "protocol"]
 
 [dependencies]
 strum = "0.24.1"
