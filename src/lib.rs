@@ -30,7 +30,7 @@
 mod protocol;
 
 mod poll;
-pub use ssip_common as types;
+pub use ssip as types;
 
 pub mod client;
 pub mod constants;
