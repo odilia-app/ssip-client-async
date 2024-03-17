@@ -1,0 +1,35 @@
+[package]
+name = "ssip-client-async"
+version = "0.12.0"
+authors = ["Laurent Pelecq <lpelecq+rust@circoise.eu>", "Tait Hoyem <tait@tait.tech>"]
+edition = "2021"
+description = "Client API for Speech Dispatcher"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/odilia-app/ssip-client-async/"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ssip = { version = "0.1.0", path = "../ssip" }
+dirs = "4"
+log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
+mio = { version = "0.8", optional = true }
+thiserror = "1"
+strum = "0.24"
+strum_macros = "0.24"
+tokio = { version = "^1.21.2", features = ["io-util", "rt", "macros", "net"] }
+async-std = { version = "1.12.0", default_features = true }
+
+[features]
+async-mio = ["mio/net", "mio/os-poll"]
+tokio = ["tokio/io-util", "tokio/rt", "tokio/macros"]
+async-std = ["async-std/default"]
+
+[dev-dependencies]
+mio = { version = "0.8", features = ["os-poll", "os-ext"] }
+tokio = { version = "^1.21.2", features = ["io-util", "rt"] }
+async-std = { version = "1.12.0", default_features = true }
+lazy_static = "1"
+popol = "1"
+tempfile = "3"
+

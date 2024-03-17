@@ -36,5 +36,5 @@ jobs:
       - name: Install Toolchain
         run: rustup target add ${{ matrix.target }}
       - name: Run tests
-        working-directory: ssip-common
+        working-directory: ssip
         run: cargo test
