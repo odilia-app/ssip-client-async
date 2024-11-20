@@ -579,7 +579,7 @@ impl<S: Read + Write + Source> Client<S> {
             OK_OUTSIDE_BLOCK => Ok(Response::OutsideBlock),
             OK_NOT_IMPLEMENTED => Ok(Response::NotImplemented),
             EVENT_INDEX_MARK => match lines.len() {
-                0 | 1 | 2 => Err(ClientError::TooFewLines),
+                0..=2 => Err(ClientError::TooFewLines),
                 3 => Ok(Response::EventIndexMark(
                     parse_event_id(&lines)?,
                     lines[2].to_owned(),
