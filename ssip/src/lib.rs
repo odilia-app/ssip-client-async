@@ -719,7 +719,7 @@ mod tests {
         let v2 = SynthesisVoice::from_str("Esperanto\teo\tnone").unwrap();
         assert_eq!("Esperanto", v2.name);
         assert_eq!("eo", v2.language.unwrap());
-        assert!(matches!(v2.dialect, None));
+        assert!(v2.dialect.is_none());
     }
 
     #[test]
