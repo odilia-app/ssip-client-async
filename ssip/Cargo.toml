@@ -2,6 +2,7 @@
 name = "ssip"
 version = "0.2.0"
 edition = "2021"
+rust-version = "1.81.0"
 readme = "README.md"
 description = "A set of types for representing SSIP requests and responses."
 license = "Apache-2.0 OR MIT"
