@@ -1,3 +1,7 @@
+//! # ssip
+//!
+//! Common types and structures for the *S*peech *S*ynthesis *I*nformation *P*rotocol.
+
 // ssip-client -- Speech Dispatcher client in Rust
 // Copyright (c) 2021 Laurent Pelecq
 //
@@ -7,9 +11,23 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-use std::fmt;
-use std::io;
-use std::str::FromStr;
+#![no_std]
+#![deny(
+    clippy::all,
+    rustdoc::all,
+    clippy::pedantic,
+    unsafe_code,
+    clippy::alloc_instead_of_core,
+    clippy::std_instead_of_alloc
+)]
+
+extern crate alloc;
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::{fmt, str::FromStr};
+
 use thiserror::Error as ThisError;
 
 use strum_macros::Display as StrumDisplay;
@@ -39,7 +57,7 @@ impl fmt::Display for MessageScope {
         match self {
             MessageScope::Last => write!(f, "self"),
             MessageScope::All => write!(f, "all"),
-            MessageScope::Message(id) => write!(f, "{}", id),
+            MessageScope::Message(id) => write!(f, "{id}"),
         }
     }
 }
@@ -60,7 +78,7 @@ impl fmt::Display for ClientScope {
         match self {
             ClientScope::Current => write!(f, "self"),
             ClientScope::All => write!(f, "all"),
-            ClientScope::Client(id) => write!(f, "{}", id),
+            ClientScope::Client(id) => write!(f, "{id}"),
         }
     }
 }
@@ -292,6 +310,7 @@ pub struct EventId {
 
 impl EventId {
     // New event identifier
+    #[must_use]
     pub fn new(message: &str, client: &str) -> Self {
         Self {
             message: message.to_string(),
@@ -308,6 +327,7 @@ pub struct Event {
 }
 
 impl Event {
+    #[must_use]
     pub fn new(ntype: EventType, message: &str, client: &str) -> Event {
         Event {
             ntype,
@@ -315,26 +335,32 @@ impl Event {
         }
     }
 
+    #[must_use]
     pub fn begin(message: &str, client: &str) -> Event {
         Event::new(EventType::Begin, message, client)
     }
 
+    #[must_use]
     pub fn end(message: &str, client: &str) -> Event {
         Event::new(EventType::End, message, client)
     }
 
+    #[must_use]
     pub fn index_mark(mark: String, message: &str, client: &str) -> Event {
         Event::new(EventType::IndexMark(mark), message, client)
     }
 
+    #[must_use]
     pub fn cancel(message: &str, client: &str) -> Event {
         Event::new(EventType::Cancel, message, client)
     }
 
+    #[must_use]
     pub fn pause(message: &str, client: &str) -> Event {
         Event::new(EventType::Pause, message, client)
     }
 
+    #[must_use]
     pub fn resume(message: &str, client: &str) -> Event {
         Event::new(EventType::Resume, message, client)
     }
@@ -349,14 +375,15 @@ pub struct SynthesisVoice {
 }
 
 impl SynthesisVoice {
+    #[must_use]
     pub fn new(name: &str, language: Option<&str>, dialect: Option<&str>) -> SynthesisVoice {
         SynthesisVoice {
             name: name.to_string(),
-            language: language.map(|s| s.to_string()),
-            dialect: dialect.map(|s| s.to_string()),
+            language: language.map(ToString::to_string),
+            dialect: dialect.map(ToString::to_string),
         }
     }
-    /// Parse Option::None or string "none" into Option::None
+    /// Parse `Option::None` or string "none" into `Option::None`
     fn parse_none(token: Option<&str>) -> Option<String> {
         match token {
             Some(s) => match s {
@@ -379,7 +406,7 @@ impl FromStr for SynthesisVoice {
                 language: SynthesisVoice::parse_none(iter.next()),
                 dialect: SynthesisVoice::parse_none(iter.next()),
             }),
-            None => Err(ClientError::unexpected_eof("missing synthesis voice name")),
+            None => Err(ClientError::UnexpectedEof("missing synthesis voice name")),
         }
     }
 }
@@ -405,8 +432,8 @@ impl fmt::Display for StatusLine {
 /// Client error, either I/O error or SSIP error.
 #[derive(ThisError, Debug)]
 pub enum ClientError {
-    #[error("I/O: {0}")]
-    Io(io::Error),
+    //#[error("I/O: {0}")]
+    //Io(io::Error),
     #[error("Not ready")]
     NotReady,
     #[error("SSIP: {0}")]
@@ -417,33 +444,10 @@ pub enum ClientError {
     TooManyLines,
     #[error("Unexpected status: {0}")]
     UnexpectedStatus(ReturnCode),
-}
-
-impl ClientError {
-    /// Create I/O error
-    pub fn io_error(kind: io::ErrorKind, msg: &str) -> Self {
-        Self::Io(io::Error::new(kind, msg))
-    }
-
-    /// Invalid data I/O error
-    pub fn invalid_data(msg: &str) -> Self {
-        ClientError::io_error(io::ErrorKind::InvalidData, msg)
-    }
-
-    /// Unexpected EOF I/O error
-    pub fn unexpected_eof(msg: &str) -> Self {
-        ClientError::io_error(io::ErrorKind::UnexpectedEof, msg)
-    }
-}
-
-impl From<io::Error> for ClientError {
-    fn from(err: io::Error) -> Self {
-        if err.kind() == io::ErrorKind::WouldBlock {
-            ClientError::NotReady
-        } else {
-            ClientError::Io(err)
-        }
-    }
+    #[error("Unexpected EOF, expected: {0}")]
+    UnexpectedEof(&'static str),
+    #[error("Invalid data, expected: {0}")]
+    InvalidData(&'static str),
 }
 
 /// Client result.
@@ -461,10 +465,12 @@ pub struct ClientName {
 }
 
 impl ClientName {
+    #[must_use]
     pub fn new(user: &str, application: &str) -> Self {
         ClientName::with_component(user, application, "main")
     }
 
+    #[must_use]
     pub fn with_component(user: &str, application: &str, component: &str) -> Self {
         ClientName {
             user: user.to_string(),
@@ -533,7 +539,7 @@ impl fmt::Display for HistoryPosition {
         match self {
             HistoryPosition::First => write!(f, "first"),
             HistoryPosition::Last => write!(f, "last"),
-            HistoryPosition::Pos(n) => write!(f, "pos {}", n),
+            HistoryPosition::Pos(n) => write!(f, "pos {n}"),
         }
     }
 }
@@ -547,6 +553,7 @@ pub struct HistoryClientStatus {
 }
 
 impl HistoryClientStatus {
+    #[must_use]
     pub fn new(id: ClientId, name: &str, connected: bool) -> Self {
         Self {
             id,
@@ -562,24 +569,19 @@ impl FromStr for HistoryClientStatus {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut iter = s.splitn(3, ' ');
         match iter.next() {
-            Some("") => Err(ClientError::unexpected_eof("expecting client id")),
+            Some("") | None => Err(ClientError::UnexpectedEof("expecting client id")),
             Some(client_id) => match client_id.parse::<u32>() {
                 Ok(id) => match iter.next() {
                     Some(name) => match iter.next() {
-                        Some("0") => {
-                            Ok(HistoryClientStatus::new(id, name, false))
-                        }
-                        Some("1") => {
-                            Ok(HistoryClientStatus::new(id, name, true))
-                        }
-                        Some(_) => Err(ClientError::invalid_data("invalid client status")),
-                        None => Err(ClientError::unexpected_eof("expecting client status")),
+                        Some("0") => Ok(HistoryClientStatus::new(id, name, false)),
+                        Some("1") => Ok(HistoryClientStatus::new(id, name, true)),
+                        Some(_) => Err(ClientError::InvalidData("invalid client status")),
+                        None => Err(ClientError::UnexpectedEof("expecting client status")),
                     },
-                    None => Err(ClientError::unexpected_eof("expecting client name")),
+                    None => Err(ClientError::UnexpectedEof("expecting client name")),
                 },
-                Err(_) => Err(ClientError::invalid_data("invalid client id")),
+                Err(_) => Err(ClientError::InvalidData("invalid client id")),
             },
-            None => Err(ClientError::unexpected_eof("expecting client id")),
         }
     }
 }
@@ -705,8 +707,8 @@ pub enum Response {
 #[cfg(test)]
 mod tests {
 
-    use std::io;
-    use std::str::FromStr;
+    use alloc::format;
+    use core::str::FromStr;
 
     use super::{ClientError, HistoryClientStatus, HistoryPosition, MessageScope, SynthesisVoice};
 
@@ -723,7 +725,7 @@ mod tests {
         let v2 = SynthesisVoice::from_str("Esperanto\teo\tnone").unwrap();
         assert_eq!("Esperanto", v2.name);
         assert_eq!("eo", v2.language.unwrap());
-        assert!(matches!(v2.dialect, None));
+        assert!(v2.dialect.is_none());
     }
 
     #[test]
@@ -756,15 +758,15 @@ mod tests {
         ] {
             match HistoryClientStatus::from_str(line) {
                 Ok(_) => panic!("parsing should have failed"),
-                Err(ClientError::Io(err)) if err.kind() == io::ErrorKind::InvalidData => (),
-                Err(_) => panic!("expecting error 'invalid data' parsing \"{}\"", line),
+                Err(ClientError::InvalidData(_)) => (),
+                Err(_) => panic!("expecting error 'invalid data' parsing \"{line}\""),
             }
         }
         for line in &["8 joe:speechd_client:main", "8", ""] {
             match HistoryClientStatus::from_str(line) {
                 Ok(_) => panic!("parsing should have failed"),
-                Err(ClientError::Io(err)) if err.kind() == io::ErrorKind::UnexpectedEof => (),
-                Err(_) => panic!("expecting error 'unexpected EOF' parsing \"{}\"", line),
+                Err(ClientError::UnexpectedEof(_)) => (),
+                Err(_) => panic!("expecting error 'unexpected EOF' parsing \"{line}\""),
             }
         }
     }

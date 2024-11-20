@@ -1,6 +1,7 @@
 [package]
 name = "ssip"
 version = "0.1.0"
+rust-version = "1.81.0"
 edition = "2021"
 readme = "README.md"
 description = "A set of types for representing SSIP requests and responses."
@@ -15,4 +16,4 @@ keywords = ["ssip", "protocol"]
 
 [dependencies]
 strum_macros = "0.24"
-thiserror = "2.0"
+thiserror = { version = "2.0", default-features = false }
