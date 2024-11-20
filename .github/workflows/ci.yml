@@ -214,8 +214,10 @@ jobs:
         uses: taiki-e/install-action@main
         with:
           tool: cargo-semver-checks
-      - name: Check Semver Compliance
-        run: LOCKSTEP_XML_PATH="../xml" cargo semver-checks check-release -p atspi --default-features
+      - name: Check Semver Compliance (ssip)
+        run: cargo semver-checks check-release -p ssip --default-features
+      - name: Check Semver Compliance (ssip-client-async)
+        run: cargo semver-checks check-release -p ssip-client-async --default-features
   msrv-compliance:
     runs-on: ubuntu-latest
     needs: [clippy,no-unused-dependencies,find-msrv]
