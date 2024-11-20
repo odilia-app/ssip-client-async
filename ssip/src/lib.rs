@@ -566,12 +566,8 @@ impl FromStr for HistoryClientStatus {
             Some(client_id) => match client_id.parse::<u32>() {
                 Ok(id) => match iter.next() {
                     Some(name) => match iter.next() {
-                        Some("0") => {
-                            Ok(HistoryClientStatus::new(id, name, false))
-                        }
-                        Some("1") => {
-                            Ok(HistoryClientStatus::new(id, name, true))
-                        }
+                        Some("0") => Ok(HistoryClientStatus::new(id, name, false)),
+                        Some("1") => Ok(HistoryClientStatus::new(id, name, true)),
                         Some(_) => Err(ClientError::invalid_data("invalid client status")),
                         None => Err(ClientError::unexpected_eof("expecting client status")),
                     },
