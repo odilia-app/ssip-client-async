@@ -27,6 +27,7 @@ async-std = ["async-std/default"]
 mio = { version = "0.8", features = ["os-poll", "os-ext"] }
 tokio = { version = "^1.21.2", features = ["io-util", "rt"] }
 async-std = { version = "1.12.0", default-features = true }
+ssip-client = { version = "0.10.0" }
 lazy_static = "1"
 popol = "1"
 tempfile = "3"
