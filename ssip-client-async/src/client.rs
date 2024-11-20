@@ -12,7 +12,7 @@ use std::io::{self, Read, Write};
 use crate::constants::*;
 use crate::protocol::{
     flush_lines, parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines,
-    write_lines
+    write_lines,
 };
 use crate::types::*;
 
@@ -627,7 +627,7 @@ impl<S: Read + Write + Source> Client<S> {
     pub fn receive_i8(&mut self) -> ClientResult<u8> {
         self.receive_string(OK_GET).and_then(|s| {
             s.parse()
-                .map_err(|_| ClientError::invalid_data("invalid signed integer"))
+                .map_err(|_| ClientError::InvalidData("invalid signed integer"))
         })
     }
 
@@ -635,7 +635,7 @@ impl<S: Read + Write + Source> Client<S> {
     pub fn receive_u8(&mut self) -> ClientResult<u8> {
         self.receive_string(OK_GET).and_then(|s| {
             s.parse()
-                .map_err(|_| ClientError::invalid_data("invalid unsigned 8-bit integer"))
+                .map_err(|_| ClientError::InvalidData("invalid unsigned 8-bit integer"))
         })
     }
 
@@ -643,7 +643,7 @@ impl<S: Read + Write + Source> Client<S> {
     pub fn receive_cursor_pos(&mut self) -> ClientResult<u16> {
         self.receive_string(OK_CUR_POS_RET).and_then(|s| {
             s.parse()
-                .map_err(|_| ClientError::invalid_data("invalid unsigned 16-bit integer"))
+                .map_err(|_| ClientError::InvalidData("invalid unsigned 16-bit integer"))
         })
     }
 
@@ -652,7 +652,7 @@ impl<S: Read + Write + Source> Client<S> {
         let mut lines = Vec::new();
         match self.receive_answer(&mut lines)?.code {
             OK_MESSAGE_QUEUED | OK_LAST_MSG => Ok(parse_single_integer(&lines)?),
-            _ => Err(ClientError::invalid_data("not a message id")),
+            _ => Err(ClientError::InvalidData("not a message id")),
         }
     }
 
@@ -660,7 +660,7 @@ impl<S: Read + Write + Source> Client<S> {
     pub fn receive_client_id(&mut self) -> ClientResult<ClientId> {
         self.receive_string(OK_CLIENT_ID_SENT).and_then(|s| {
             s.parse()
-                .map_err(|_| ClientError::invalid_data("invalid client id"))
+                .map_err(|_| ClientError::InvalidData("invalid client id"))
         })
     }
 
@@ -675,14 +675,14 @@ impl<S: Read + Write + Source> Client<S> {
         let mut lines = Vec::new();
         crate::protocol::receive_answer(&mut self.input, Some(&mut lines)).and_then(|status| {
             if lines.len() < 2 {
-                Err(ClientError::unexpected_eof("event truncated"))
+                Err(ClientError::UnexpectedEof("event truncated"))
             } else {
                 let message = &lines[0];
                 let client = &lines[1];
                 match status.code {
                     700 => {
                         if lines.len() != 3 {
-                            Err(ClientError::unexpected_eof("index markevent truncated"))
+                            Err(ClientError::UnexpectedEof("index markevent truncated"))
                         } else {
                             let mark = lines[3].to_owned();
                             Ok(Event::index_mark(mark, message, client))
@@ -693,7 +693,7 @@ impl<S: Read + Write + Source> Client<S> {
                     703 => Ok(Event::cancel(message, client)),
                     704 => Ok(Event::pause(message, client)),
                     705 => Ok(Event::resume(message, client)),
-                    _ => Err(ClientError::invalid_data("wrong status code for event")),
+                    _ => Err(ClientError::InvalidData("wrong status code for event")),
                 }
             }
         })
