@@ -1,6 +1,6 @@
 [package]
 name = "ssip"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 readme = "README.md"
 description = "A set of types for representing SSIP requests and responses."
@@ -14,5 +14,5 @@ authors = [
 keywords = ["ssip", "protocol"]
 
 [dependencies]
-strum_macros = "0.24"
+strum_macros = "0.26"
 thiserror = "1.0.40"
