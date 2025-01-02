@@ -7,9 +7,19 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-use std::fmt;
-use std::io;
-use std::str::FromStr;
+#![no_std]
+#![forbid(clippy::std_instead_of_alloc, clippy::alloc_instead_of_core)]
+
+extern crate alloc;
+use alloc::{
+	string::{String, ToString},
+	vec::Vec,
+};
+use core::{
+	fmt,
+	str::FromStr,
+};
+
 use thiserror::Error as ThisError;
 
 use strum_macros::Display as StrumDisplay;
@@ -405,8 +415,6 @@ impl fmt::Display for StatusLine {
 /// Client error, either I/O error or SSIP error.
 #[derive(ThisError, Debug)]
 pub enum ClientError {
-    #[error("I/O: {0}")]
-    Io(io::Error),
     #[error("Not ready")]
     NotReady,
     #[error("SSIP: {0}")]
@@ -417,32 +425,21 @@ pub enum ClientError {
     TooManyLines,
     #[error("Unexpected status: {0}")]
     UnexpectedStatus(ReturnCode),
+		#[error("Unexpected EOF: {0}")]
+		UnexpectedEof(&'static str),
+		#[error("Invalid data: {0}")]
+		InvalidData(&'static str),
 }
 
 impl ClientError {
-    /// Create I/O error
-    pub fn io_error(kind: io::ErrorKind, msg: &str) -> Self {
-        Self::Io(io::Error::new(kind, msg))
-    }
-
     /// Invalid data I/O error
-    pub fn invalid_data(msg: &str) -> Self {
-        ClientError::io_error(io::ErrorKind::InvalidData, msg)
+    pub fn invalid_data(msg: &'static str) -> Self {
+        ClientError::InvalidData(msg)
     }
 
     /// Unexpected EOF I/O error
-    pub fn unexpected_eof(msg: &str) -> Self {
-        ClientError::io_error(io::ErrorKind::UnexpectedEof, msg)
-    }
-}
-
-impl From<io::Error> for ClientError {
-    fn from(err: io::Error) -> Self {
-        if err.kind() == io::ErrorKind::WouldBlock {
-            ClientError::NotReady
-        } else {
-            ClientError::Io(err)
-        }
+    pub fn unexpected_eof(msg: &'static str) -> Self {
+        ClientError::UnexpectedEof(msg)
     }
 }
 
@@ -701,8 +698,8 @@ pub enum Response {
 #[cfg(test)]
 mod tests {
 
-    use std::io;
-    use std::str::FromStr;
+		use alloc::format;
+		use core::str::FromStr;
 
     use super::{ClientError, HistoryClientStatus, HistoryPosition, MessageScope, SynthesisVoice};
 
@@ -752,14 +749,14 @@ mod tests {
         ] {
             match HistoryClientStatus::from_str(line) {
                 Ok(_) => panic!("parsing should have failed"),
-                Err(ClientError::Io(err)) if err.kind() == io::ErrorKind::InvalidData => (),
+                Err(ClientError::InvalidData(_)) => (),
                 Err(_) => panic!("expecting error 'invalid data' parsing \"{}\"", line),
             }
         }
         for line in &["8 joe:speechd_client:main", "8", ""] {
             match HistoryClientStatus::from_str(line) {
                 Ok(_) => panic!("parsing should have failed"),
-                Err(ClientError::Io(err)) if err.kind() == io::ErrorKind::UnexpectedEof => (),
+                Err(ClientError::UnexpectedEof(_)) => (),
                 Err(_) => panic!("expecting error 'unexpected EOF' parsing \"{}\"", line),
             }
         }
