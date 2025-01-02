@@ -12,13 +12,10 @@
 
 extern crate alloc;
 use alloc::{
-	string::{String, ToString},
-	vec::Vec,
+    string::{String, ToString},
+    vec::Vec,
 };
-use core::{
-	fmt,
-	str::FromStr,
-};
+use core::{fmt, str::FromStr};
 
 use thiserror::Error as ThisError;
 
@@ -425,10 +422,10 @@ pub enum ClientError {
     TooManyLines,
     #[error("Unexpected status: {0}")]
     UnexpectedStatus(ReturnCode),
-		#[error("Unexpected EOF: {0}")]
-		UnexpectedEof(&'static str),
-		#[error("Invalid data: {0}")]
-		InvalidData(&'static str),
+    #[error("Unexpected EOF: {0}")]
+    UnexpectedEof(&'static str),
+    #[error("Invalid data: {0}")]
+    InvalidData(&'static str),
 }
 
 impl ClientError {
@@ -698,8 +695,8 @@ pub enum Response {
 #[cfg(test)]
 mod tests {
 
-		use alloc::format;
-		use core::str::FromStr;
+    use alloc::format;
+    use core::str::FromStr;
 
     use super::{ClientError, HistoryClientStatus, HistoryPosition, MessageScope, SynthesisVoice};
 
