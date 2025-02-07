@@ -21,15 +21,6 @@ use std::str::FromStr;
 
 use crate::types::{ClientError, ClientResult, ClientStatus, EventId, StatusLine};
 
-macro_rules! invalid_input {
-    ($msg:expr) => {
-        ClientError::from(io::Error::new(io::ErrorKind::InvalidInput, $msg))
-    };
-    ($fmt:expr, $($arg:tt)*) => {
-        invalid_input!(format!($fmt, $($arg)*).as_str())
-    };
-}
-
 /// Return the only string in the list or an error if there is no line or too many.
 pub(crate) fn parse_single_value(lines: &[String]) -> ClientResult<String> {
     match lines.len() {
@@ -71,70 +62,6 @@ where
         .collect::<ClientResult<Vec<T>>>()
 }
 
-/// Write lines separated by CRLF.
-pub(crate) fn write_lines<W: Write + ?Sized>(output: &mut W, lines: &[&str]) -> ClientResult<()> {
-    for line in lines.iter() {
-        debug!("SSIP(out): {}", line);
-        output.write_all(line.as_bytes())?;
-        output.write_all(b"\r\n")?;
-    }
-    Ok(())
-}
-
-/// Write lines (asyncronously) separated by CRLF.
-#[cfg(any(feature = "tokio", doc))]
-pub(crate) async fn write_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
-    output: &mut W,
-    lines: &[&str],
-) -> ClientResult<()> {
-    for line in lines.iter() {
-        debug!("SSIP(out): {}", line);
-        output.write_all(line.as_bytes()).await?;
-        output.write_all(b"\r\n").await?;
-    }
-    Ok(())
-}
-/// Write lines (asyncronously) separated by CRLF.
-#[cfg(any(feature = "async-std", doc))]
-pub(crate) async fn write_lines_async_std<W: AsyncWriteStd + Unpin + ?Sized>(
-    output: &mut W,
-    lines: &[&str],
-) -> ClientResult<()> {
-    for line in lines.iter() {
-        debug!("SSIP(out): {}", line);
-        output.write_all(line.as_bytes()).await?;
-        output.write_all(b"\r\n").await?;
-    }
-    Ok(())
-}
-
-/// Write lines separated by CRLF and flush the output.
-pub(crate) fn flush_lines<W: Write + ?Sized>(output: &mut W, lines: &[&str]) -> ClientResult<()> {
-    write_lines(output, lines)?;
-    output.flush()?;
-    Ok(())
-}
-/// Write lines separated by CRLF and flush the output asyncronously.
-#[cfg(any(feature = "tokio", doc))]
-pub(crate) async fn flush_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
-    output: &mut W,
-    lines: &[&str],
-) -> ClientResult<()> {
-    write_lines_tokio(output, lines).await?;
-    output.flush().await?;
-    Ok(())
-}
-/// Write lines separated by CRLF and flush the output asyncronously.
-#[cfg(any(feature = "async-std", doc))]
-pub(crate) async fn flush_lines_async_std<W: AsyncWriteStd + Unpin + ?Sized>(
-    output: &mut W,
-    lines: &[&str],
-) -> ClientResult<()> {
-    write_lines_async_std(output, lines).await?;
-    output.flush().await?;
-    Ok(())
-}
-
 /// Strip prefix if found
 fn strip_prefix(line: &str, prefix: &str) -> String {
     line.strip_prefix(prefix).unwrap_or(line).to_string()
@@ -153,93 +80,6 @@ fn parse_status_line(code: u16, line: &str) -> ClientStatus {
     }
 }
 
-/// Read lines from server until a status line is found.
-#[cfg(any(feature = "tokio", doc))]
-pub(crate) async fn receive_answer_tokio<W: AsyncBufRead + Unpin + ?Sized>(
-    input: &mut W,
-    mut lines: Option<&mut Vec<String>>,
-) -> ClientStatus {
-    loop {
-        let mut line = String::new();
-        input.read_line(&mut line).await.map_err(ClientError::Io)?;
-        debug!("SSIP(in): {}", line.trim_end());
-        match line.chars().nth(3) {
-            Some(ch) => match ch {
-                ' ' => match line[0..3].parse::<u16>() {
-                    Ok(code) => return parse_status_line(code, line[4..].trim_end()),
-                    Err(err) => return Err(invalid_input!(err.to_string())),
-                },
-                '-' => match lines {
-                    Some(ref mut lines) => lines.push(line[4..].trim_end().to_string()),
-                    None => return Err(invalid_input!("unexpected line: {}", line)),
-                },
-                ch => {
-                    return Err(invalid_input!("expecting space or dash, got {}.", ch));
-                }
-            },
-            None if line.is_empty() => return Err(invalid_input!("empty line")),
-            None => return Err(invalid_input!("line too short: {}", line)),
-        }
-    }
-}
-/// Read lines from server until a status line is found.
-#[cfg(any(feature = "async-std", doc))]
-pub(crate) async fn receive_answer_async_std<W: AsyncBufReadStd + Unpin + ?Sized>(
-    input: &mut W,
-    mut lines: Option<&mut Vec<String>>,
-) -> ClientStatus {
-    loop {
-        let mut line = String::new();
-        input.read_line(&mut line).await.map_err(ClientError::Io)?;
-        debug!("SSIP(in): {}", line.trim_end());
-        match line.chars().nth(3) {
-            Some(ch) => match ch {
-                ' ' => match line[0..3].parse::<u16>() {
-                    Ok(code) => return parse_status_line(code, line[4..].trim_end()),
-                    Err(err) => return Err(invalid_input!(err.to_string())),
-                },
-                '-' => match lines {
-                    Some(ref mut lines) => lines.push(line[4..].trim_end().to_string()),
-                    None => return Err(invalid_input!("unexpected line: {}", line)),
-                },
-                ch => {
-                    return Err(invalid_input!("expecting space or dash, got {}.", ch));
-                }
-            },
-            None if line.is_empty() => return Err(invalid_input!("empty line")),
-            None => return Err(invalid_input!("line too short: {}", line)),
-        }
-    }
-}
-
-/// Read lines from server until a status line is found asyncronously.
-pub(crate) fn receive_answer<W: BufRead + ?Sized>(
-    input: &mut W,
-    mut lines: Option<&mut Vec<String>>,
-) -> ClientStatus {
-    loop {
-        let mut line = String::new();
-        input.read_line(&mut line).map_err(ClientError::Io)?;
-        debug!("SSIP(in): {}", line.trim_end());
-        match line.chars().nth(3) {
-            Some(ch) => match ch {
-                ' ' => match line[0..3].parse::<u16>() {
-                    Ok(code) => return parse_status_line(code, line[4..].trim_end()),
-                    Err(err) => return Err(invalid_input!(err.to_string())),
-                },
-                '-' => match lines {
-                    Some(ref mut lines) => lines.push(line[4..].trim_end().to_string()),
-                    None => return Err(invalid_input!("unexpected line: {}", line)),
-                },
-                ch => {
-                    return Err(invalid_input!("expecting space or dash, got {}.", ch));
-                }
-            },
-            None if line.is_empty() => return Err(invalid_input!("empty line")),
-            None => return Err(invalid_input!("line too short: {}", line)),
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {
