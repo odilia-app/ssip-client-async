@@ -10,6 +10,7 @@
 #![no_std]
 #![forbid(clippy::std_instead_of_alloc, clippy::alloc_instead_of_core)]
 
+#[macro_use]
 pub mod protocol;
 pub mod constants;
 
@@ -577,6 +578,11 @@ impl FromStr for HistoryClientStatus {
     }
 }
 
+#[test]
+fn test() {
+    assert_eq!(Request::SetName(ClientName { user: "user".to_string(), application: "application".to_string(), component: "component".to_string() }).to_string(), "SET self CLIENT_NAME user:application:component");
+}
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 /// Request for SSIP server.
 pub enum Request {
@@ -637,6 +643,118 @@ pub enum Request {
     HistorySearch(ClientScope, String),
     // Misc.
     Quit,
+}
+
+impl core::fmt::Display for Request {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Request::SetName(client_name) => write!(f,
+                
+                "SET self CLIENT_NAME {}:{}:{}",
+                client_name.user,
+                client_name.application,
+                client_name.component
+            ),
+            Request::Speak => write!(f, "SPEAK"),
+            Request::SendLine(line) => write!(f, "{}", line),
+            Request::SendLines(lines) => write!(f, "{}", lines.join("\n")),
+            Request::SpeakChar(ch) => write!(f, "CHAR {}", ch),
+            Request::SpeakKey(key) => write!(f, "KEY {}", key),
+            Request::Stop(scope) => write!(f, "STOP {}", scope),
+            Request::Cancel(scope) => write!(f, "CANCEL {}", scope),
+            Request::Pause(scope) => write!(f, "PAUSE {}", scope),
+            Request::Resume(scope) => write!(f, "RESUME {}", scope),
+            Request::SetPriority(prio) => write!(f, "SET self PRIORITY {}", prio),
+            Request::SetDebug(value) => write!(f, "SET all DEBUG {}", value),
+            Request::SetOutputModule(scope, value) => {
+                write!(f, "SET {} OUTPUT_MODULE {}", scope, value)
+            }
+            Request::GetOutputModule => write!(f, "GET OUTPUT_MODULE"),
+            Request::ListOutputModules => write!(f, "LIST OUTPUT_MODULES"),
+            Request::SetLanguage(scope, lang) => {
+                write!(f, "SET {} LANGUAGE {}", scope, lang)
+            }
+            Request::GetLanguage => write!(f, "GET LANGUAGE"),
+            Request::SetSsmlMode(value) => write!(f, "SET self SSML_MODE {}", value),
+            Request::SetPunctuationMode(scope, mode) => {
+                write!(f, "SET {} PUNCTUATION {}", scope, mode)
+            }
+            Request::SetSpelling(scope, value) => {
+                write!(f, "SET {} SPELLING {}", scope, value)
+            }
+            Request::SetCapitalLettersRecognitionMode(scope, mode) => {
+                write!(f, "SET {} CAP_LET_RECOGN {}", scope, mode)
+            }
+            Request::SetVoiceType(scope, value) => {
+                write!(f, "SET {} VOICE_TYPE {}", scope, value)
+            }
+            Request::GetVoiceType => write!(f, "GET VOICE_TYPE"),
+            Request::ListVoiceTypes => write!(f, "LIST VOICES"),
+            Request::SetSynthesisVoice(scope, value) => {
+                write!(f, "SET {} SYNTHESIS_VOICE {}", scope, value)
+            }
+            Request::ListSynthesisVoices => write!(f, "LIST SYNTHESIS_VOICES"),
+            Request::SetRate(scope, value) => write!(f, "SET {} RATE {}", scope, value),
+            Request::GetRate => write!(f, "GET RATE"),
+            Request::SetPitch(scope, value) => write!(f, "SET {} PITCH {}", scope, value),
+            Request::GetPitch => write!(f, "GET PITCH"),
+            Request::SetVolume(scope, value) => {
+                write!(f, "SET {} VOLUME {}", scope, value)
+            }
+            Request::GetVolume => write!(f, "GET VOLUME"),
+            Request::SetPauseContext(scope, value) => {
+                write!(f, "SET {} PAUSE_CONTEXT {}", scope, value)
+            }
+            Request::SetHistory(scope, value) => {
+                write!(f, "SET {} HISTORY {}", scope, value)
+            }
+            Request::SetNotification(ntype, value) => {
+                write!(f, "SET self NOTIFICATION {} {}", ntype, value)
+            }
+            Request::Begin => write!(f, "BLOCK BEGIN"),
+            Request::End => write!(f, "BLOCK END"),
+            Request::HistoryGetClients => write!(f, "HISTORY GET CLIENT_LIST"),
+            Request::HistoryGetClientId => write!(f, "HISTORY GET CLIENT_ID"),
+            Request::HistoryGetClientMsgs(scope, start, number) => write!(f,
+                
+                "HISTORY GET CLIENT_MESSAGES {} {}_{}",
+                scope,
+                start,
+                number
+            ),
+            Request::HistoryGetLastMsgId => write!(f, "HISTORY GET LAST"),
+            Request::HistoryGetMsg(id) => write!(f, "HISTORY GET MESSAGE {}", id),
+            Request::HistoryCursorGet => write!(f, "HISTORY CURSOR GET"),
+            Request::HistoryCursorSet(scope, pos) => {
+                write!(f, "HISTORY CURSOR SET {} {}", scope, pos)
+            }
+            Request::HistoryCursorMove(direction) => {
+                write!(f, "HISTORY CURSOR {}", direction)
+            }
+            Request::HistorySpeak(id) => write!(f, "HISTORY SAY {}", id),
+            Request::HistorySort(direction, key) => {
+                write!(f, "HISTORY SORT {} {}", direction, key)
+            }
+            Request::HistorySetShortMsgLength(length) => {
+                write!(f, "HISTORY SET SHORT_MESSAGE_LENGTH {}", length)
+            }
+            Request::HistorySetMsgTypeOrdering(ordering) => {
+                write!(f,
+                    
+                    "HISTORY SET MESSAGE_TYPE_ORDERING \"{}\"",
+                    ordering
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(" ")
+                )
+            }
+            Request::HistorySearch(scope, condition) => {
+                write!(f, "HISTORY SEARCH {} \"{}\"", scope, condition)
+            }
+            Request::Quit => write!(f, "QUIT"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]

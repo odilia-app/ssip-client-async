@@ -26,18 +26,15 @@
 //! # Ok::<(), ssip_client::ClientError>(())
 //! ```
 
-#[macro_use]
-mod protocol;
-
 mod poll;
 pub use ssip as types;
 
 pub mod client;
-pub mod constants;
 #[cfg(unix)]
 pub mod fifo;
 pub mod net;
 pub mod tcp;
+mod error;
 
 #[cfg(any(not(feature = "async-mio"), doc))]
 pub use client::Client;
@@ -47,6 +44,6 @@ pub mod async_std;
 #[cfg(any(feature = "tokio", doc))]
 pub mod tokio;
 
-pub use constants::*;
 pub use poll::QueuedClient;
-pub use types::*;
+pub use ssip::constants;
+pub use error::Error;

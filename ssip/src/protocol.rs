@@ -1,18 +1,36 @@
 use crate::{
 	Error,
 	EventId,
-	StatusLine,
-	ClientStatus,
+  StatusLine,
+  ClientStatus,
 };
 use alloc::vec::Vec;
 use alloc::string::{String, ToString};
 use core::{
 	str::FromStr,
-	fmt::Error as FmtError,
 };
 
+/// Strip prefix if found
+fn strip_prefix(line: &str, prefix: &str) -> String {
+    line.strip_prefix(prefix).unwrap_or(line).to_string()
+}
+
+/// Parse the status line "OK msg" or "ERR msg"
+pub fn parse_status_line(code: u16, line: &str) -> ClientStatus {
+    if (300..700).contains(&code) {
+        const TOKEN_ERR: &str = "ERR ";
+        let message = strip_prefix(line, TOKEN_ERR);
+        Err(Error::Ssip(StatusLine { code, message }))
+    } else {
+        const TOKEN_OK: &str = "OK ";
+        let message = strip_prefix(line, TOKEN_OK);
+        Ok(StatusLine { code, message })
+    }
+}
+
+
 /// Return the only string in the list or an error if there is no line or too many.
-pub(crate) fn parse_single_value(lines: &[String]) -> Result<String, Error> {
+pub fn parse_single_value(lines: &[String]) -> Result<String, Error> {
     match lines.len() {
         0 => Err(Error::TooFewLines),
         1 => Ok(lines[0].to_string()),
@@ -21,7 +39,7 @@ pub(crate) fn parse_single_value(lines: &[String]) -> Result<String, Error> {
 }
 
 /// Convert two lines of the response in an event id
-pub(crate) fn parse_event_id(lines: &[String]) -> Result<EventId, Error> {
+pub fn parse_event_id(lines: &[String]) -> Result<EventId, Error> {
     match lines.len() {
         0 | 1 => Err(Error::TooFewLines),
         2 => Ok(EventId::new(&lines[0], &lines[1])),
@@ -30,7 +48,7 @@ pub(crate) fn parse_event_id(lines: &[String]) -> Result<EventId, Error> {
 }
 
 /// Parse single integer value
-pub(crate) fn parse_single_integer<T>(lines: &[String]) -> Result<T, Error>
+pub fn parse_single_integer<T>(lines: &[String]) -> Result<T, Error>
 where
     T: FromStr,
 {
@@ -41,7 +59,7 @@ where
     })
 }
 
-pub(crate) fn parse_typed_lines<T>(lines: &[String]) -> Result<Vec<T>, Error>
+pub fn parse_typed_lines<T>(lines: &[String]) -> Result<Vec<T>, Error>
 where
     T: FromStr<Err = Error>,
 {
@@ -49,24 +67,6 @@ where
         .iter()
         .map(|line| T::from_str(line.as_str()))
         .collect()
-}
-
-/// Strip prefix if found
-fn strip_prefix(line: &str, prefix: &str) -> String {
-    line.strip_prefix(prefix).unwrap_or(line).to_string()
-}
-
-/// Parse the status line "OK msg" or "ERR msg"
-fn parse_status_line(code: u16, line: &str) -> ClientStatus {
-    if (300..700).contains(&code) {
-        const TOKEN_ERR: &str = "ERR ";
-        let message = strip_prefix(line, TOKEN_ERR);
-        Err(Error::Ssip(StatusLine { code, message }))
-    } else {
-        const TOKEN_OK: &str = "OK ";
-        let message = strip_prefix(line, TOKEN_OK);
-        Ok(StatusLine { code, message })
-    }
 }
 
 /*
@@ -99,3 +99,4 @@ pub(crate) fn receive_bytes(
     }
 }
 */
+

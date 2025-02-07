@@ -7,14 +7,14 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-use std::io::{self, Read, Write};
+use std::io::{self, Read, Write, BufRead};
 
 use crate::constants::*;
-use crate::protocol::{
-    flush_lines, parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines,
-    write_lines,
+use ssip::protocol::{
+    parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines, parse_status_line,
 };
 use crate::types::*;
+use log::debug;
 
 // Trick to have common implementation for std and mio streams..
 #[cfg(all(not(feature = "async-mio"), unix))]
@@ -22,6 +22,141 @@ pub use std::os::unix::io::AsRawFd as Source;
 
 #[cfg(feature = "async-mio")]
 pub use mio::event::Source;
+
+macro_rules! invalid_input {
+    ($msg:expr) => {
+        Error::InvalidInput($msg)
+    };
+    ($fmt:expr, $($arg:tt)*) => {
+        invalid_input!(format!($fmt, $($arg)*).as_str())
+    };
+}
+
+/// Read lines from server until a status line is found.
+#[cfg(any(feature = "async-std", doc))]
+pub(crate) async fn receive_answer_async_std<W: AsyncBufReadStd + Unpin + ?Sized>(
+    input: &mut W,
+    mut lines: Option<&mut Vec<String>>,
+) -> ClientStatus {
+    loop {
+        let mut line = String::new();
+        input.read_line(&mut line).await.map_err(Error::Io)?;
+        debug!("SSIP(in): {}", line.trim_end());
+        match line.chars().nth(3) {
+            Some(ch) => match ch {
+                ' ' => match line[0..3].parse::<u16>() {
+                    Ok(code) => return parse_status_line(code, line[4..].trim_end()),
+                    Err(err) => return Err(invalid_input!(err.to_string())),
+                },
+                '-' => match lines {
+                    Some(ref mut lines) => lines.push(line[4..].trim_end().to_string()),
+                    None => return Err(invalid_input!("unexpected line: {}", line)),
+                },
+                ch => {
+                    return Err(invalid_input!("expecting space or dash, got {}.", ch));
+                }
+            },
+            None if line.is_empty() => return Err(invalid_input!("empty line")),
+            None => return Err(invalid_input!("line too short: {}", line)),
+        }
+    }
+}
+
+/// Read lines from server until a status line is found.
+#[cfg(any(feature = "tokio", doc))]
+pub(crate) async fn receive_answer_tokio<W: AsyncBufRead + Unpin + ?Sized>(
+    input: &mut W,
+    mut lines: Option<&mut Vec<String>>,
+) -> ClientStatus {
+    loop {
+        let mut line = String::new();
+        input.read_line(&mut line).await.map_err(Error::Io)?;
+        debug!("SSIP(in): {}", line.trim_end());
+        match line.chars().nth(3) {
+            Some(ch) => match ch {
+                ' ' => match line[0..3].parse::<u16>() {
+                    Ok(code) => return parse_status_line(code, line[4..].trim_end()),
+                    Err(err) => return Err(invalid_input!(err.to_string())),
+                },
+                '-' => match lines {
+                    Some(ref mut lines) => lines.push(line[4..].trim_end().to_string()),
+                    None => return Err(invalid_input!("unexpected line: {}", line)),
+                },
+                ch => {
+                    return Err(invalid_input!("expecting space or dash, got {}.", ch));
+                }
+            },
+            None if line.is_empty() => return Err(invalid_input!("empty line")),
+            None => return Err(invalid_input!("line too short: {}", line)),
+        }
+    }
+}
+
+/// Write lines separated by CRLF.
+pub(crate) fn write_lines<W: Write + ?Sized>(output: &mut W, lines: &[&str]) -> Result<(), io::Error> {
+    for line in lines.iter() {
+        debug!("SSIP(out): {}", line);
+        output.write_all(line.as_bytes())?;
+        output.write_all(b"\r\n")?;
+    }
+    Ok(())
+}
+
+/// Write lines (asyncronously) separated by CRLF.
+#[cfg(any(feature = "tokio", doc))]
+pub(crate) async fn write_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
+    output: &mut W,
+    lines: &[&str],
+) -> Result<(), tokio::io::Error> {
+    for line in lines.iter() {
+        debug!("SSIP(out): {}", line);
+        output.write_all(line.as_bytes()).await?;
+        output.write_all(b"\r\n").await?;
+    }
+    Ok(())
+}
+/// Write lines (asyncronously) separated by CRLF.
+#[cfg(any(feature = "async-std", doc))]
+pub(crate) async fn write_lines_async_std<W: AsyncWriteStd + Unpin + ?Sized>(
+    output: &mut W,
+    lines: &[&str],
+) -> ClientResult<()> {
+    for line in lines.iter() {
+        debug!("SSIP(out): {}", line);
+        output.write_all(line.as_bytes()).await?;
+        output.write_all(b"\r\n").await?;
+    }
+    Ok(())
+}
+
+
+/// Write lines separated by CRLF and flush the output.
+pub(crate) fn flush_lines<W: Write + ?Sized>(output: &mut W, lines: &[&str]) -> Result<(), io::Error> {
+    write_lines(output, lines)?;
+    output.flush()?;
+    Ok(())
+}
+/// Write lines separated by CRLF and flush the output asyncronously.
+#[cfg(any(feature = "tokio", doc))]
+pub(crate) async fn flush_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
+    output: &mut W,
+    lines: &[&str],
+) -> ClientResult<()> {
+    write_lines_tokio(output, lines).await?;
+    output.flush().await?;
+    Ok(())
+}
+/// Write lines separated by CRLF and flush the output asyncronously.
+#[cfg(any(feature = "async-std", doc))]
+pub(crate) async fn flush_lines_async_std<W: AsyncWriteStd + Unpin + ?Sized>(
+    output: &mut W,
+    lines: &[&str],
+) -> ClientResult<()> {
+    write_lines_async_std(output, lines).await?;
+    output.flush().await?;
+    Ok(())
+}
+
 
 /// Convert boolean to ON or OFF
 fn on_off(value: bool) -> &'static str {
@@ -91,7 +226,7 @@ impl<S: Read + Write + Source> Client<S> {
     }
 
     /// Send lines of text (terminated by a single dot).
-    pub fn send_lines(&mut self, lines: &[String]) -> ClientResult<&mut Self> {
+    pub fn send_lines(&mut self, lines: &[String]) -> Result<&mut Self, io::Error> {
         const END_OF_DATA: [&str; 1] = ["."];
         write_lines(
             &mut self.output,
@@ -106,7 +241,7 @@ impl<S: Read + Write + Source> Client<S> {
     }
 
     /// Send one line of text (terminated by a single dot).
-    pub fn send_line(&mut self, line: &str) -> ClientResult<&mut Self> {
+    pub fn send_line(&mut self, line: &str) -> Result<&mut Self, io::Error> {
         const END_OF_DATA: &str = ".";
         flush_lines(&mut self.output, &[line, END_OF_DATA])?;
         Ok(self)
@@ -513,7 +648,7 @@ impl<S: Read + Write + Source> Client<S> {
 
     /// Receive answer from server
     fn receive_answer(&mut self, lines: &mut Vec<String>) -> ClientStatus {
-        crate::protocol::receive_answer(&mut self.input, Some(lines))
+        receive_answer(&mut self.input, Some(lines))
     }
 
     /// Receive one response.
@@ -579,12 +714,12 @@ impl<S: Read + Write + Source> Client<S> {
             OK_OUTSIDE_BLOCK => Ok(Response::OutsideBlock),
             OK_NOT_IMPLEMENTED => Ok(Response::NotImplemented),
             EVENT_INDEX_MARK => match lines.len() {
-                0..=2 => Err(ClientError::TooFewLines),
+                0..=2 => Err(Error::TooFewLines),
                 3 => Ok(Response::EventIndexMark(
                     parse_event_id(&lines)?,
                     lines[2].to_owned(),
                 )),
-                _ => Err(ClientError::TooManyLines),
+                _ => Err(Error::TooManyLines),
             },
             EVENT_BEGIN => Ok(Response::EventBegin(parse_event_id(&lines)?)),
             EVENT_END => Ok(Response::EventEnd(parse_event_id(&lines)?)),
@@ -597,11 +732,11 @@ impl<S: Read + Write + Source> Client<S> {
 
     /// Check status of answer, discard lines.
     pub fn check_status(&mut self, expected_code: ReturnCode) -> ClientResult<&mut Self> {
-        crate::protocol::receive_answer(&mut self.input, None).and_then(|status| {
+        receive_answer(&mut self.input, None).and_then(|status| {
             if status.code == expected_code {
                 Ok(self)
             } else {
-                Err(ClientError::UnexpectedStatus(status.code))
+                Err(Error::UnexpectedStatus(status.code))
             }
         })
     }
@@ -613,7 +748,7 @@ impl<S: Read + Write + Source> Client<S> {
         if status.code == expected_code {
             Ok(lines)
         } else {
-            Err(ClientError::UnexpectedStatus(status.code))
+            Err(Error::UnexpectedStatus(status.code))
         }
     }
 
@@ -627,7 +762,7 @@ impl<S: Read + Write + Source> Client<S> {
     pub fn receive_i8(&mut self) -> ClientResult<u8> {
         self.receive_string(OK_GET).and_then(|s| {
             s.parse()
-                .map_err(|_| ClientError::invalid_data("invalid signed integer"))
+                .map_err(|_| Error::invalid_data("invalid signed integer"))
         })
     }
 
@@ -635,7 +770,7 @@ impl<S: Read + Write + Source> Client<S> {
     pub fn receive_u8(&mut self) -> ClientResult<u8> {
         self.receive_string(OK_GET).and_then(|s| {
             s.parse()
-                .map_err(|_| ClientError::invalid_data("invalid unsigned 8-bit integer"))
+                .map_err(|_| Error::invalid_data("invalid unsigned 8-bit integer"))
         })
     }
 
@@ -643,7 +778,7 @@ impl<S: Read + Write + Source> Client<S> {
     pub fn receive_cursor_pos(&mut self) -> ClientResult<u16> {
         self.receive_string(OK_CUR_POS_RET).and_then(|s| {
             s.parse()
-                .map_err(|_| ClientError::invalid_data("invalid unsigned 16-bit integer"))
+                .map_err(|_| Error::invalid_data("invalid unsigned 16-bit integer"))
         })
     }
 
@@ -652,7 +787,7 @@ impl<S: Read + Write + Source> Client<S> {
         let mut lines = Vec::new();
         match self.receive_answer(&mut lines)?.code {
             OK_MESSAGE_QUEUED | OK_LAST_MSG => Ok(parse_single_integer(&lines)?),
-            _ => Err(ClientError::invalid_data("not a message id")),
+            _ => Err(Error::invalid_data("not a message id")),
         }
     }
 
@@ -660,7 +795,7 @@ impl<S: Read + Write + Source> Client<S> {
     pub fn receive_client_id(&mut self) -> ClientResult<ClientId> {
         self.receive_string(OK_CLIENT_ID_SENT).and_then(|s| {
             s.parse()
-                .map_err(|_| ClientError::invalid_data("invalid client id"))
+                .map_err(|_| Error::invalid_data("invalid client id"))
         })
     }
 
@@ -673,16 +808,16 @@ impl<S: Read + Write + Source> Client<S> {
     /// Receive a notification
     pub fn receive_event(&mut self) -> ClientResult<Event> {
         let mut lines = Vec::new();
-        crate::protocol::receive_answer(&mut self.input, Some(&mut lines)).and_then(|status| {
+        receive_answer(&mut self.input, Some(&mut lines)).and_then(|status| {
             if lines.len() < 2 {
-                Err(ClientError::unexpected_eof("event truncated"))
+                Err(Error::unexpected_eof("event truncated"))
             } else {
                 let message = &lines[0];
                 let client = &lines[1];
                 match status.code {
                     700 => {
                         if lines.len() != 3 {
-                            Err(ClientError::unexpected_eof("index markevent truncated"))
+                            Err(Error::unexpected_eof("index markevent truncated"))
                         } else {
                             let mark = lines[3].to_owned();
                             Ok(Event::index_mark(mark, message, client))
@@ -693,7 +828,7 @@ impl<S: Read + Write + Source> Client<S> {
                     703 => Ok(Event::cancel(message, client)),
                     704 => Ok(Event::pause(message, client)),
                     705 => Ok(Event::resume(message, client)),
-                    _ => Err(ClientError::invalid_data("wrong status code for event")),
+                    _ => Err(Error::invalid_data("wrong status code for event")),
                 }
             }
         })
@@ -730,3 +865,32 @@ impl<S: Read + Write + Source> Client<S> {
         Ok(())
     }
 }
+/// Read lines from server until a status line is found asyncronously.
+pub fn receive_answer<W: BufRead + ?Sized>(
+    input: &mut W,
+    mut lines: Option<&mut Vec<String>>,
+) -> ClientStatus {
+    loop {
+        let mut line = String::new();
+        input.read_line(&mut line).map_err(Error::Io)?;
+        debug!("SSIP(in): {}", line.trim_end());
+        match line.chars().nth(3) {
+            Some(ch) => match ch {
+                ' ' => match line[0..3].parse::<u16>() {
+                    Ok(code) => return parse_status_line(code, line[4..].trim_end()),
+                    Err(err) => return Err(invalid_input!(err.to_string())),
+                },
+                '-' => match lines {
+                    Some(ref mut lines) => lines.push(line[4..].trim_end().to_string()),
+                    None => return Err(invalid_input!("unexpected line: {}", line)),
+                },
+                ch => {
+                    return Err(invalid_input!("expecting space or dash, got {}.", ch));
+                }
+            },
+            None if line.is_empty() => return Err(invalid_input!("empty line")),
+            None => return Err(invalid_input!("line too short: {}", line)),
+        }
+    }
+}
+
