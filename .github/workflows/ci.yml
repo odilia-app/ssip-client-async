@@ -10,6 +10,7 @@ on:
       - main
 jobs:
   compile-client-on-std-targets:
+    needs: [msrv-compliance, clippy, no-unused-dependencies, rustfmt, tests, rustdoc,coverage]
     runs-on: ubuntu-latest
     strategy:
       matrix:
