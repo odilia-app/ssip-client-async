@@ -9,6 +9,35 @@ on:
     branches:
       - main
 jobs:
+  compile-client-on-std-targets:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl, aarch64-unknown-linux-musl, aarch64-unknown-linux-gnu, riscv64gc-unknown-linux-gnu, riscv64gc-unknown-linux-musl]
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+      - name: Cache cargo home
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-cargo-home
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-${{ matrix.target }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-build-${{ env.cache-name }}-
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - name: Install Toolchain
+        run: rustup target add ${{ matrix.target }}
+      - name: Build full client on ${{ matrix.target }}
+        run: cargo build --target ${{ matrix.target }}
   compile-common-types-across-architectures:
     runs-on: ubuntu-latest
     strategy:
