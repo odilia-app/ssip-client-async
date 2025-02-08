@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl, wasm32-unknown-unknown, wasm32-wasi, aarch64-unknown-linux-musl, aarch64-unknown-linux-gnu]
+        target: [x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl, wasm32-unknown-unknown, wasm32-wasi, aarch64-unknown-linux-musl, aarch64-unknown-linux-gnu, riscv64gc-unknown-linux-gnu, riscv64gc-unknown-linux-musl]
     steps:
       - name: Git checkout
         uses: actions/checkout@v3
@@ -36,9 +36,9 @@ jobs:
           toolchain: stable
       - name: Install Toolchain
         run: rustup target add ${{ matrix.target }}
-      - name: Run tests
+      - name: Compile on ${{ matrix.target }}
         working-directory: ssip
-        run: cargo test
+        run: cargo build --target ${{ matrix.target }}
   find-msrv:
     runs-on: ubuntu-latest
     outputs:
