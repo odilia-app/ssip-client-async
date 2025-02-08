@@ -9,11 +9,12 @@ on:
     branches:
       - main
 jobs:
-  compile-common-types-across-architectures:
+  compile-client-on-std-targets:
+    needs: [msrv-compliance, clippy, no-unused-dependencies, rustfmt, tests, rustdoc,coverage]
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl, wasm32-unknown-unknown, wasm32-wasi, aarch64-unknown-linux-musl, aarch64-unknown-linux-gnu]
+        target: [x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl, aarch64-unknown-linux-musl, aarch64-unknown-linux-gnu, riscv64gc-unknown-linux-gnu, riscv64gc-unknown-linux-musl]
     steps:
       - name: Git checkout
         uses: actions/checkout@v3
@@ -36,9 +37,8 @@ jobs:
           toolchain: stable
       - name: Install Toolchain
         run: rustup target add ${{ matrix.target }}
-      - name: Run tests
-        working-directory: ssip
-        run: cargo test
+      - name: Build full client on ${{ matrix.target }}
+        run: cargo build --target ${{ matrix.target }}
   find-msrv:
     runs-on: ubuntu-latest
     outputs:
@@ -251,6 +251,7 @@ jobs:
       - name: cargo llvm-cov
         run: cargo llvm-cov --workspace --locked --lcov --output-path lcov.info
       - name: Upload to codecov.io
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
