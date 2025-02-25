@@ -7,14 +7,15 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-use std::io::{self, Read, Write, BufRead};
+use std::io::{self, BufRead, Read, Write};
 
 use crate::constants::*;
-use ssip::protocol::{
-    parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines, parse_status_line,
-};
 use crate::types::*;
+use crate::{ClientResult, ClientStatus};
 use log::debug;
+use ssip::protocol::{
+    parse_event_id, parse_single_integer, parse_single_value, parse_status_line, parse_typed_lines,
+};
 
 // Trick to have common implementation for std and mio streams..
 #[cfg(all(not(feature = "async-mio"), unix))]
@@ -93,7 +94,10 @@ pub(crate) async fn receive_answer_tokio<W: AsyncBufRead + Unpin + ?Sized>(
 }
 
 /// Write lines separated by CRLF.
-pub(crate) fn write_lines<W: Write + ?Sized>(output: &mut W, lines: &[&str]) -> Result<(), io::Error> {
+pub(crate) fn write_lines<W: Write + ?Sized>(
+    output: &mut W,
+    lines: &[&str],
+) -> Result<(), io::Error> {
     for line in lines.iter() {
         debug!("SSIP(out): {}", line);
         output.write_all(line.as_bytes())?;
@@ -129,9 +133,11 @@ pub(crate) async fn write_lines_async_std<W: AsyncWriteStd + Unpin + ?Sized>(
     Ok(())
 }
 
-
 /// Write lines separated by CRLF and flush the output.
-pub(crate) fn flush_lines<W: Write + ?Sized>(output: &mut W, lines: &[&str]) -> Result<(), io::Error> {
+pub(crate) fn flush_lines<W: Write + ?Sized>(
+    output: &mut W,
+    lines: &[&str],
+) -> Result<(), io::Error> {
     write_lines(output, lines)?;
     output.flush()?;
     Ok(())
@@ -156,7 +162,6 @@ pub(crate) async fn flush_lines_async_std<W: AsyncWriteStd + Unpin + ?Sized>(
     output.flush().await?;
     Ok(())
 }
-
 
 /// Convert boolean to ON or OFF
 fn on_off(value: bool) -> &'static str {
@@ -893,4 +898,3 @@ pub fn receive_answer<W: BufRead + ?Sized>(
         }
     }
 }
-

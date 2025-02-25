@@ -13,6 +13,8 @@
 #[macro_use]
 pub mod protocol;
 pub mod constants;
+pub mod error;
+pub use error::Error;
 
 extern crate alloc;
 use alloc::{
@@ -20,8 +22,6 @@ use alloc::{
     vec::Vec,
 };
 use core::{fmt, str::FromStr};
-
-use thiserror::Error as ThisError;
 
 use strum_macros::Display as StrumDisplay;
 
@@ -413,42 +413,12 @@ impl fmt::Display for StatusLine {
         write!(f, "{} {}", self.code, self.message)
     }
 }
-/// Client error, either I/O error or SSIP error.
-#[derive(ThisError, Debug)]
-pub enum Error {
-    #[error("Not ready")]
-    NotReady,
-    #[error("SSIP: {0}")]
-    Ssip(StatusLine),
-    #[error("Too few lines")]
-    TooFewLines,
-    #[error("Too many lines")]
-    TooManyLines,
-    #[error("Unexpected status: {0}")]
-    UnexpectedStatus(ReturnCode),
-    #[error("Unexpected EOF: {0}")]
-    UnexpectedEof(&'static str),
-    #[error("Invalid data: {0}")]
-    InvalidData(&'static str),
-}
-
-impl Error {
-    /// Invalid data I/O error
-    pub fn invalid_data(msg: &'static str) -> Self {
-        Error::InvalidData(msg)
-    }
-
-    /// Unexpected EOF I/O error
-    pub fn unexpected_eof(msg: &'static str) -> Self {
-        Error::UnexpectedEof(msg)
-    }
-}
 
 /// Client result.
-pub type ClientResult<T> = Result<T, Error>;
+pub type SsipResult<T> = Result<T, Error>;
 
 /// Client result consisting in a single status line
-pub type ClientStatus = ClientResult<StatusLine>;
+pub type SsipStatus = SsipResult<StatusLine>;
 
 /// Client name
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -580,7 +550,15 @@ impl FromStr for HistoryClientStatus {
 
 #[test]
 fn test() {
-    assert_eq!(Request::SetName(ClientName { user: "user".to_string(), application: "application".to_string(), component: "component".to_string() }).to_string(), "SET self CLIENT_NAME user:application:component");
+    assert_eq!(
+        Request::SetName(ClientName {
+            user: "user".to_string(),
+            application: "application".to_string(),
+            component: "component".to_string()
+        })
+        .to_string(),
+        "SET self CLIENT_NAME user:application:component"
+    );
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -648,12 +626,10 @@ pub enum Request {
 impl core::fmt::Display for Request {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Request::SetName(client_name) => write!(f,
-                
+            Request::SetName(client_name) => write!(
+                f,
                 "SET self CLIENT_NAME {}:{}:{}",
-                client_name.user,
-                client_name.application,
-                client_name.component
+                client_name.user, client_name.application, client_name.component
             ),
             Request::Speak => write!(f, "SPEAK"),
             Request::SendLine(line) => write!(f, "{}", line),
@@ -715,12 +691,10 @@ impl core::fmt::Display for Request {
             Request::End => write!(f, "BLOCK END"),
             Request::HistoryGetClients => write!(f, "HISTORY GET CLIENT_LIST"),
             Request::HistoryGetClientId => write!(f, "HISTORY GET CLIENT_ID"),
-            Request::HistoryGetClientMsgs(scope, start, number) => write!(f,
-                
+            Request::HistoryGetClientMsgs(scope, start, number) => write!(
+                f,
                 "HISTORY GET CLIENT_MESSAGES {} {}_{}",
-                scope,
-                start,
-                number
+                scope, start, number
             ),
             Request::HistoryGetLastMsgId => write!(f, "HISTORY GET LAST"),
             Request::HistoryGetMsg(id) => write!(f, "HISTORY GET MESSAGE {}", id),
@@ -739,8 +713,8 @@ impl core::fmt::Display for Request {
                 write!(f, "HISTORY SET SHORT_MESSAGE_LENGTH {}", length)
             }
             Request::HistorySetMsgTypeOrdering(ordering) => {
-                write!(f,
-                    
+                write!(
+                    f,
                     "HISTORY SET MESSAGE_TYPE_ORDERING \"{}\"",
                     ordering
                         .iter()
