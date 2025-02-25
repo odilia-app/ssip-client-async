@@ -1,7 +1,7 @@
-extern crate tokio;
-use ssip_client::{
+use ssip_client_async::{
     fifo::asynchronous_tokio::Builder, types::ClientScope, ClientName, ClientResult,
 };
+use tokio;
 
 #[cfg(all(unix, feature = "tokio"))]
 #[tokio::main(flavor = "current_thread")]
