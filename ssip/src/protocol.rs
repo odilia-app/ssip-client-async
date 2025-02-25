@@ -2,8 +2,9 @@ use crate::{
 	Error,
 	EventId,
   StatusLine,
-  ClientStatus,
+  SsipStatus,
 };
+use alloc::format;
 use alloc::vec::Vec;
 use alloc::string::{String, ToString};
 use core::{
@@ -16,7 +17,7 @@ fn strip_prefix(line: &str, prefix: &str) -> String {
 }
 
 /// Parse the status line "OK msg" or "ERR msg"
-pub fn parse_status_line(code: u16, line: &str) -> ClientStatus {
+pub fn parse_status_line(code: u16, line: &str) -> SsipStatus {
     if (300..700).contains(&code) {
         const TOKEN_ERR: &str = "ERR ";
         let message = strip_prefix(line, TOKEN_ERR);
@@ -72,31 +73,26 @@ where
 /*
 /// Read lines from server until a status line is found asyncronously.
 pub(crate) fn receive_bytes(
-    input: &mut W,
+    line: &mut str,
     mut lines: Option<&mut Vec<String>>,
-) -> ClientStatus {
-    loop {
-        let mut line = String::new();
-        input.read_line(&mut line).map_err(ClientError::Io)?;
-        debug!("SSIP(in): {}", line.trim_end());
-        match line.chars().nth(3) {
-            Some(ch) => match ch {
-                ' ' => match line[0..3].parse::<u16>() {
-                    Ok(code) => return parse_status_line(code, line[4..].trim_end()),
-                    Err(err) => return Err(invalid_input!(err.to_string())),
-                },
-                '-' => match lines {
-                    Some(ref mut lines) => lines.push(line[4..].trim_end().to_string()),
-                    None => return Err(invalid_input!("unexpected line: {}", line)),
-                },
-                ch => {
-                    return Err(invalid_input!("expecting space or dash, got {}.", ch));
-                }
+) -> SsipStatus {
+    log::debug!("SSIP(in): {}", line);
+    match line.chars().nth(3) {
+        Some(ch) => match ch {
+            ' ' => match line[0..3].parse::<u16>() {
+                Ok(code) => return parse_status_line(code, line[4..].trim_end()),
+                Err(err) => return Err(Error::invalid_data(&err.to_string())),
             },
-            None if line.is_empty() => return Err(invalid_input!("empty line")),
-            None => return Err(invalid_input!("line too short: {}", line)),
-        }
+            '-' => match lines {
+                Some(ref mut lines) => lines.push(line[4..].trim_end().to_string()),
+                None => return Err(Error::invalid_data(&format!("unexpected line: {}", line))),
+            },
+            ch => {
+                return Err(Error::invalid_data(&format!("expecting space or dash, got {}.", ch)));
+            }
+        },
+        None if line.is_empty() => return Err(Error::invalid_data("empty line")),
+        None => return Err(Error::invalid_data(&format!("line too short: {}", line))),
     }
 }
 */
-

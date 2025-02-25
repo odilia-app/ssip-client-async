@@ -13,6 +13,8 @@
 #[macro_use]
 pub mod protocol;
 pub mod constants;
+pub mod error;
+pub use error::Error;
 
 extern crate alloc;
 use alloc::{
@@ -20,8 +22,6 @@ use alloc::{
     vec::Vec,
 };
 use core::{fmt, str::FromStr};
-
-use thiserror::Error as ThisError;
 
 use strum_macros::Display as StrumDisplay;
 
@@ -413,42 +413,12 @@ impl fmt::Display for StatusLine {
         write!(f, "{} {}", self.code, self.message)
     }
 }
-/// Client error, either I/O error or SSIP error.
-#[derive(ThisError, Debug)]
-pub enum Error {
-    #[error("Not ready")]
-    NotReady,
-    #[error("SSIP: {0}")]
-    Ssip(StatusLine),
-    #[error("Too few lines")]
-    TooFewLines,
-    #[error("Too many lines")]
-    TooManyLines,
-    #[error("Unexpected status: {0}")]
-    UnexpectedStatus(ReturnCode),
-    #[error("Unexpected EOF: {0}")]
-    UnexpectedEof(&'static str),
-    #[error("Invalid data: {0}")]
-    InvalidData(&'static str),
-}
-
-impl Error {
-    /// Invalid data I/O error
-    pub fn invalid_data(msg: &'static str) -> Self {
-        Error::InvalidData(msg)
-    }
-
-    /// Unexpected EOF I/O error
-    pub fn unexpected_eof(msg: &'static str) -> Self {
-        Error::UnexpectedEof(msg)
-    }
-}
 
 /// Client result.
-pub type ClientResult<T> = Result<T, Error>;
+pub type SsipResult<T> = Result<T, Error>;
 
 /// Client result consisting in a single status line
-pub type ClientStatus = ClientResult<StatusLine>;
+pub type SsipStatus = SsipResult<StatusLine>;
 
 /// Client name
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

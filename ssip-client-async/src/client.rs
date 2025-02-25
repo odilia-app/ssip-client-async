@@ -9,6 +9,7 @@
 
 use std::io::{self, Read, Write, BufRead};
 
+use crate::{ClientResult, ClientStatus};
 use crate::constants::*;
 use ssip::protocol::{
     parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines, parse_status_line,

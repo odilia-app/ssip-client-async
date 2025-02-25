@@ -47,3 +47,6 @@ pub mod tokio;
 pub use poll::QueuedClient;
 pub use ssip::constants;
 pub use error::Error;
+
+pub type ClientResult<T> = Result<T, Error>;
+pub type ClientStatus = ClientResult<types::StatusLine>;

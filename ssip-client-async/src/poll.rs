@@ -11,6 +11,7 @@ use std::collections::VecDeque;
 use std::io::{Read, Write};
 
 use crate::{
+    ClientResult,
     client::{Client, Source},
     types::*,
 };
