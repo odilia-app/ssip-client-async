@@ -1,5 +1,5 @@
 #[cfg(all(unix, not(feature = "async-mio")))]
-use ssip_client::{
+use ssip_client_async::{
     fifo, ClientName, ClientResult, EventType, NotificationType, OK_NOTIFICATION_SET,
 };
 
