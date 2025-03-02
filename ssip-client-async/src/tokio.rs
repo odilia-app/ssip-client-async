@@ -7,8 +7,9 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
+use crate::{ClientResult, ClientStatus};
 use crate::constants::*;
-use crate::protocol::{
+use ssip::protocol::{
     flush_lines_tokio, parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines,
     write_lines_tokio,
 };
@@ -62,6 +63,7 @@ pub struct AsyncClient<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> {
     input: R,
     output: W,
 }
+#[cfg(feature = "tokio")]
 impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     pub(crate) fn new(input: R, output: W) -> Self {
         Self { input, output }

@@ -9,6 +9,8 @@
 
 use std::io::{self, BufRead, Read, Write};
 
+#[cfg(feature = "tokio")]
+use tokio::io::{AsyncBufRead, AsyncWrite};
 use crate::constants::*;
 use crate::types::*;
 use crate::{ClientResult, ClientStatus};
