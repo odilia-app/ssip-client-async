@@ -8,7 +8,9 @@ use std::{
 };
 
 #[cfg(all(unix, feature = "async-mio"))]
-use ssip_client::{fifo, ClientError, ClientName, ClientResult, QueuedClient, Request, Response};
+use ssip_client_async::{
+    fifo, ClientError, ClientName, ClientResult, QueuedClient, Request, Response,
+};
 
 #[cfg(all(unix, feature = "async-mio"))]
 fn main() -> ClientResult<()> {

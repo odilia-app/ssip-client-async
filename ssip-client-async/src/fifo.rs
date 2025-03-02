@@ -168,14 +168,15 @@ pub mod asynchronous_tokio {
     pub struct Builder {
         path: FifoPath,
     }
-
-    impl Builder {
-        pub fn new() -> Self {
+    impl Default for Builder {
+        fn default() -> Self {
             Self {
                 path: FifoPath::new(),
             }
         }
+    }
 
+    impl Builder {
         pub fn path<P>(&mut self, socket_path: P) -> &mut Self
         where
             P: AsRef<Path>,

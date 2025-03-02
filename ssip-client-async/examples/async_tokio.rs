@@ -1,13 +1,13 @@
-extern crate tokio;
-use ssip_client::{
-    fifo::asynchronous_tokio::Builder, types::ClientScope, ClientName, ClientResult,
+use ssip_client_async::{
+    fifo::asynchronous_tokio::Builder,
+    types::{ClientName, ClientResult, ClientScope},
 };
 
 #[cfg(all(unix, feature = "tokio"))]
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> ClientResult<()> {
     println!("Example:");
-    let mut client = Builder::new().build().await?;
+    let mut client = Builder::default().build().await?;
     println!("Client created.");
     client
         .set_client_name(ClientName::new("test", "hello"))
@@ -48,7 +48,7 @@ async fn main() -> ClientResult<()> {
         .receive_message_id()
         .await?;
     println!("id2: {}", msg_id);
-    client.quit().await?;
+    client.quit().await?.receive().await?;
     Ok(())
 }
 

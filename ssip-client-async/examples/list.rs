@@ -1,5 +1,5 @@
 #[cfg(all(unix, not(feature = "async-mio")))]
-use ssip_client::{
+use ssip_client_async::{
     fifo, ClientName, ClientResult, SynthesisVoice, OK_OUTPUT_MODULES_LIST_SENT,
     OK_VOICES_LIST_SENT,
 };
@@ -12,7 +12,7 @@ fn main() -> ClientResult<()> {
                 Some(dialect) => format!("{} [{}_{}]", voice.name, language, dialect),
                 None => format!("{} [{}]", voice.name, language),
             },
-            None => format!("{}", voice.name),
+            None => voice.name.clone(),
         }
     }
 
@@ -44,13 +44,10 @@ fn main() -> ClientResult<()> {
     let voices = client.list_synthesis_voices()?.receive_synthesis_voices()?;
     print_list(
         SYNTHESIS_VOICES_TITLE,
-        &voices
-            .iter()
-            .map(|ref v| voice_to_string(v))
-            .collect::<Vec<String>>(),
+        &voices.iter().map(voice_to_string).collect::<Vec<String>>(),
     );
 
-    client.quit().unwrap();
+    client.quit()?.receive()?;
     Ok(())
 }
 
