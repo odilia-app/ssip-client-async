@@ -50,7 +50,7 @@ fn main() -> ClientResult<()> {
             .collect::<Vec<String>>(),
     );
 
-    client.quit().unwrap();
+    client.quit()?.receive()?;
     Ok(())
 }
 

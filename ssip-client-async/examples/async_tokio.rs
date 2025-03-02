@@ -48,7 +48,7 @@ async fn main() -> ClientResult<()> {
         .receive_message_id()
         .await?;
     println!("id2: {}", msg_id);
-    client.quit().await?;
+    client.quit().await?.receive().await?;
     Ok(())
 }
 

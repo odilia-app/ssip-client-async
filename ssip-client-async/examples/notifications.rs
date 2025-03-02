@@ -39,7 +39,7 @@ fn main() -> ClientResult<()> {
         }
     }
     println!("exiting...");
-    client.quit()?;
+    client.quit()?.receive()?;
     Ok(())
 }
 
