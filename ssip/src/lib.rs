@@ -7,10 +7,21 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-use std::fmt;
-use std::io;
-use std::str::FromStr;
-use thiserror::Error as ThisError;
+#![no_std]
+#![forbid(clippy::std_instead_of_alloc, clippy::alloc_instead_of_core)]
+
+#[macro_use]
+pub mod protocol;
+pub mod constants;
+pub mod error;
+pub use error::Error;
+
+extern crate alloc;
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::{fmt, str::FromStr};
 
 use strum_macros::Display as StrumDisplay;
 
@@ -369,7 +380,7 @@ impl SynthesisVoice {
 }
 
 impl FromStr for SynthesisVoice {
-    type Err = ClientError;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut iter = s.split('\t');
@@ -379,7 +390,7 @@ impl FromStr for SynthesisVoice {
                 language: SynthesisVoice::parse_none(iter.next()),
                 dialect: SynthesisVoice::parse_none(iter.next()),
             }),
-            None => Err(ClientError::unexpected_eof("missing synthesis voice name")),
+            None => Err(Error::unexpected_eof("missing synthesis voice name")),
         }
     }
 }
@@ -402,55 +413,12 @@ impl fmt::Display for StatusLine {
         write!(f, "{} {}", self.code, self.message)
     }
 }
-/// Client error, either I/O error or SSIP error.
-#[derive(ThisError, Debug)]
-pub enum ClientError {
-    #[error("I/O: {0}")]
-    Io(io::Error),
-    #[error("Not ready")]
-    NotReady,
-    #[error("SSIP: {0}")]
-    Ssip(StatusLine),
-    #[error("Too few lines")]
-    TooFewLines,
-    #[error("Too many lines")]
-    TooManyLines,
-    #[error("Unexpected status: {0}")]
-    UnexpectedStatus(ReturnCode),
-}
-
-impl ClientError {
-    /// Create I/O error
-    pub fn io_error(kind: io::ErrorKind, msg: &str) -> Self {
-        Self::Io(io::Error::new(kind, msg))
-    }
-
-    /// Invalid data I/O error
-    pub fn invalid_data(msg: &str) -> Self {
-        ClientError::io_error(io::ErrorKind::InvalidData, msg)
-    }
-
-    /// Unexpected EOF I/O error
-    pub fn unexpected_eof(msg: &str) -> Self {
-        ClientError::io_error(io::ErrorKind::UnexpectedEof, msg)
-    }
-}
-
-impl From<io::Error> for ClientError {
-    fn from(err: io::Error) -> Self {
-        if err.kind() == io::ErrorKind::WouldBlock {
-            ClientError::NotReady
-        } else {
-            ClientError::Io(err)
-        }
-    }
-}
 
 /// Client result.
-pub type ClientResult<T> = Result<T, ClientError>;
+pub type SsipResult<T> = Result<T, Error>;
 
 /// Client result consisting in a single status line
-pub type ClientStatus = ClientResult<StatusLine>;
+pub type SsipStatus = SsipResult<StatusLine>;
 
 /// Client name
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -557,27 +525,40 @@ impl HistoryClientStatus {
 }
 
 impl FromStr for HistoryClientStatus {
-    type Err = ClientError;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut iter = s.splitn(3, ' ');
         match iter.next() {
-            Some("") => Err(ClientError::unexpected_eof("expecting client id")),
+            Some("") => Err(Error::unexpected_eof("expecting client id")),
             Some(client_id) => match client_id.parse::<u32>() {
                 Ok(id) => match iter.next() {
                     Some(name) => match iter.next() {
                         Some("0") => Ok(HistoryClientStatus::new(id, name, false)),
                         Some("1") => Ok(HistoryClientStatus::new(id, name, true)),
-                        Some(_) => Err(ClientError::invalid_data("invalid client status")),
-                        None => Err(ClientError::unexpected_eof("expecting client status")),
+                        Some(_) => Err(Error::invalid_data("invalid client status")),
+                        None => Err(Error::unexpected_eof("expecting client status")),
                     },
-                    None => Err(ClientError::unexpected_eof("expecting client name")),
+                    None => Err(Error::unexpected_eof("expecting client name")),
                 },
-                Err(_) => Err(ClientError::invalid_data("invalid client id")),
+                Err(_) => Err(Error::invalid_data("invalid client id")),
             },
-            None => Err(ClientError::unexpected_eof("expecting client id")),
+            None => Err(Error::unexpected_eof("expecting client id")),
         }
     }
+}
+
+#[test]
+fn test() {
+    assert_eq!(
+        Request::SetName(ClientName {
+            user: "user".to_string(),
+            application: "application".to_string(),
+            component: "component".to_string()
+        })
+        .to_string(),
+        "SET self CLIENT_NAME user:application:component"
+    );
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -642,6 +623,114 @@ pub enum Request {
     Quit,
 }
 
+impl core::fmt::Display for Request {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Request::SetName(client_name) => write!(
+                f,
+                "SET self CLIENT_NAME {}:{}:{}",
+                client_name.user, client_name.application, client_name.component
+            ),
+            Request::Speak => write!(f, "SPEAK"),
+            Request::SendLine(line) => write!(f, "{}", line),
+            Request::SendLines(lines) => write!(f, "{}", lines.join("\n")),
+            Request::SpeakChar(ch) => write!(f, "CHAR {}", ch),
+            Request::SpeakKey(key) => write!(f, "KEY {}", key),
+            Request::Stop(scope) => write!(f, "STOP {}", scope),
+            Request::Cancel(scope) => write!(f, "CANCEL {}", scope),
+            Request::Pause(scope) => write!(f, "PAUSE {}", scope),
+            Request::Resume(scope) => write!(f, "RESUME {}", scope),
+            Request::SetPriority(prio) => write!(f, "SET self PRIORITY {}", prio),
+            Request::SetDebug(value) => write!(f, "SET all DEBUG {}", value),
+            Request::SetOutputModule(scope, value) => {
+                write!(f, "SET {} OUTPUT_MODULE {}", scope, value)
+            }
+            Request::GetOutputModule => write!(f, "GET OUTPUT_MODULE"),
+            Request::ListOutputModules => write!(f, "LIST OUTPUT_MODULES"),
+            Request::SetLanguage(scope, lang) => {
+                write!(f, "SET {} LANGUAGE {}", scope, lang)
+            }
+            Request::GetLanguage => write!(f, "GET LANGUAGE"),
+            Request::SetSsmlMode(value) => write!(f, "SET self SSML_MODE {}", value),
+            Request::SetPunctuationMode(scope, mode) => {
+                write!(f, "SET {} PUNCTUATION {}", scope, mode)
+            }
+            Request::SetSpelling(scope, value) => {
+                write!(f, "SET {} SPELLING {}", scope, value)
+            }
+            Request::SetCapitalLettersRecognitionMode(scope, mode) => {
+                write!(f, "SET {} CAP_LET_RECOGN {}", scope, mode)
+            }
+            Request::SetVoiceType(scope, value) => {
+                write!(f, "SET {} VOICE_TYPE {}", scope, value)
+            }
+            Request::GetVoiceType => write!(f, "GET VOICE_TYPE"),
+            Request::ListVoiceTypes => write!(f, "LIST VOICES"),
+            Request::SetSynthesisVoice(scope, value) => {
+                write!(f, "SET {} SYNTHESIS_VOICE {}", scope, value)
+            }
+            Request::ListSynthesisVoices => write!(f, "LIST SYNTHESIS_VOICES"),
+            Request::SetRate(scope, value) => write!(f, "SET {} RATE {}", scope, value),
+            Request::GetRate => write!(f, "GET RATE"),
+            Request::SetPitch(scope, value) => write!(f, "SET {} PITCH {}", scope, value),
+            Request::GetPitch => write!(f, "GET PITCH"),
+            Request::SetVolume(scope, value) => {
+                write!(f, "SET {} VOLUME {}", scope, value)
+            }
+            Request::GetVolume => write!(f, "GET VOLUME"),
+            Request::SetPauseContext(scope, value) => {
+                write!(f, "SET {} PAUSE_CONTEXT {}", scope, value)
+            }
+            Request::SetHistory(scope, value) => {
+                write!(f, "SET {} HISTORY {}", scope, value)
+            }
+            Request::SetNotification(ntype, value) => {
+                write!(f, "SET self NOTIFICATION {} {}", ntype, value)
+            }
+            Request::Begin => write!(f, "BLOCK BEGIN"),
+            Request::End => write!(f, "BLOCK END"),
+            Request::HistoryGetClients => write!(f, "HISTORY GET CLIENT_LIST"),
+            Request::HistoryGetClientId => write!(f, "HISTORY GET CLIENT_ID"),
+            Request::HistoryGetClientMsgs(scope, start, number) => write!(
+                f,
+                "HISTORY GET CLIENT_MESSAGES {} {}_{}",
+                scope, start, number
+            ),
+            Request::HistoryGetLastMsgId => write!(f, "HISTORY GET LAST"),
+            Request::HistoryGetMsg(id) => write!(f, "HISTORY GET MESSAGE {}", id),
+            Request::HistoryCursorGet => write!(f, "HISTORY CURSOR GET"),
+            Request::HistoryCursorSet(scope, pos) => {
+                write!(f, "HISTORY CURSOR SET {} {}", scope, pos)
+            }
+            Request::HistoryCursorMove(direction) => {
+                write!(f, "HISTORY CURSOR {}", direction)
+            }
+            Request::HistorySpeak(id) => write!(f, "HISTORY SAY {}", id),
+            Request::HistorySort(direction, key) => {
+                write!(f, "HISTORY SORT {} {}", direction, key)
+            }
+            Request::HistorySetShortMsgLength(length) => {
+                write!(f, "HISTORY SET SHORT_MESSAGE_LENGTH {}", length)
+            }
+            Request::HistorySetMsgTypeOrdering(ordering) => {
+                write!(
+                    f,
+                    "HISTORY SET MESSAGE_TYPE_ORDERING \"{}\"",
+                    ordering
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(" ")
+                )
+            }
+            Request::HistorySearch(scope, condition) => {
+                write!(f, "HISTORY SEARCH {} \"{}\"", scope, condition)
+            }
+            Request::Quit => write!(f, "QUIT"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 /// Response from SSIP server.
 pub enum Response {
@@ -701,10 +790,10 @@ pub enum Response {
 #[cfg(test)]
 mod tests {
 
-    use std::io;
-    use std::str::FromStr;
+    use alloc::format;
+    use core::str::FromStr;
 
-    use super::{ClientError, HistoryClientStatus, HistoryPosition, MessageScope, SynthesisVoice};
+    use super::{Error, HistoryClientStatus, HistoryPosition, MessageScope, SynthesisVoice};
 
     #[test]
     fn parse_synthesis_voice() {
@@ -752,14 +841,14 @@ mod tests {
         ] {
             match HistoryClientStatus::from_str(line) {
                 Ok(_) => panic!("parsing should have failed"),
-                Err(ClientError::Io(err)) if err.kind() == io::ErrorKind::InvalidData => (),
+                Err(Error::InvalidData(_)) => (),
                 Err(_) => panic!("expecting error 'invalid data' parsing \"{}\"", line),
             }
         }
         for line in &["8 joe:speechd_client:main", "8", ""] {
             match HistoryClientStatus::from_str(line) {
                 Ok(_) => panic!("parsing should have failed"),
-                Err(ClientError::Io(err)) if err.kind() == io::ErrorKind::UnexpectedEof => (),
+                Err(Error::UnexpectedEof(_)) => (),
                 Err(_) => panic!("expecting error 'unexpected EOF' parsing \"{}\"", line),
             }
         }

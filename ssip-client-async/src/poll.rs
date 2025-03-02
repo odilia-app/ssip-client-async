@@ -13,6 +13,7 @@ use std::io::{Read, Write};
 use crate::{
     client::{Client, Source},
     types::*,
+    ClientResult,
 };
 
 // Hack to generate the doc. There must be a better way.

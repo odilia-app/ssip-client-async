@@ -7,7 +7,7 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-use crate::types::ReturnCode;
+use crate::ReturnCode;
 
 /// Successful completion: OK LANGUAGE SET
 pub const OK_LANGUAGE_SET: ReturnCode = 201;
