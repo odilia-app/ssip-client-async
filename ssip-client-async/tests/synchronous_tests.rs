@@ -7,7 +7,7 @@
 // modified, or distributed except according to those terms.
 
 #[cfg(not(feature = "async-mio"))]
-use ssip_client::{client::Source, *};
+use ssip_client_async::{client::Source, *};
 #[cfg(all(unix, not(feature = "async-mio")))]
 use std::os::unix::net::UnixStream;
 #[cfg(not(feature = "async-mio"))]
@@ -39,7 +39,7 @@ where
     assert!(!socket_path.exists());
     let mut process_wrapper = std::panic::AssertUnwindSafe(process);
     let handle = server::run_unix(&socket_path, communication)?;
-    let mut client = ssip_client::fifo::Builder::new()
+    let mut client = ssip_client_async::fifo::Builder::new()
         .path(&socket_path)
         .build()?;
     client
@@ -71,7 +71,7 @@ where
     let tcp_port = TCP_PORT.clone().fetch_add(1, AtomicOrdering::SeqCst);
     let addr = format!("127.0.0.1:{}", tcp_port);
     let handle = server::run_tcp(&addr, communication)?;
-    let mut client = ssip_client::tcp::Builder::new(&addr)?.build()?;
+    let mut client = ssip_client_async::tcp::Builder::new(&addr)?.build()?;
     client
         .set_client_name(ClientName::new("test", "test"))?
         .check_client_name_set()?;

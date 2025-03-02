@@ -16,14 +16,14 @@
 //!
 //! Example
 //! ```no_run
-//! use ssip_client::{fifo, ClientName};
+//! use ssip_client_async::{fifo, ClientName};
 //! let mut client = fifo::Builder::new().build()?;
 //! client
 //!     .set_client_name(ClientName::new("joe", "hello"))?
 //!     .check_client_name_set()?;
 //! let msg_id = client.speak()?.send_line("hello")?.receive_message_id()?;
 //! client.quit()?;
-//! # Ok::<(), ssip_client::ClientError>(())
+//! # Ok::<(), ssip_client_async::ClientError>(())
 //! ```
 
 #[macro_use]
