@@ -7,11 +7,9 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-use std::io::{self, Read, Write};
-
 use crate::constants::*;
 use crate::protocol::{
-    flush_lines, flush_lines_async_std, parse_event_id, parse_single_integer, parse_single_value,
+    flush_lines_async_std, parse_event_id, parse_single_integer, parse_single_value,
     parse_typed_lines, write_lines_async_std,
 };
 use crate::types::*;
@@ -29,10 +27,10 @@ fn on_off(value: bool) -> &'static str {
 
 macro_rules! send_one_line {
     ($self:expr, $fmt:expr, $( $arg:expr ),+) => {
-        flush_lines(&mut $self.output, &[format!($fmt, $( $arg ),+).as_str()])
+        flush_lines_async_std(&mut $self.output, &[format!($fmt, $( $arg ),+).as_str()]).await
     };
     ($self:expr, $fmt:expr) => {
-        flush_lines(&mut $self.output, &[$fmt])
+        flush_lines_async_std(&mut $self.output, &[$fmt]).await
     }
 }
 
@@ -66,11 +64,11 @@ pub struct AsyncClient<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> {
     output: W,
 }
 impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
-    pub(crate) fn new(input: R, output: W) -> Self {
+    pub fn new(input: R, output: W) -> Self {
         Self { input, output }
     }
     /// Send lines of text (terminated by a single dot).
-    pub async fn send_lines(&mut self, lines: &[String]) -> ClientResult<&mut Self> {
+    pub async fn send_lines(&mut self, lines: &[String]) -> ClientResult<()> {
         const END_OF_DATA: [&str; 1] = ["."];
         write_lines_async_std(
             &mut self.output,
@@ -82,7 +80,7 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
         )
         .await?;
         flush_lines_async_std(&mut self.output, &END_OF_DATA).await?;
-        Ok(self)
+        Ok(())
     }
     /// Receive answer from server
     async fn receive_answer(&mut self, lines: &mut Vec<String>) -> ClientStatus {
@@ -151,7 +149,7 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
             OK_OUTSIDE_BLOCK => Ok(Response::OutsideBlock),
             OK_NOT_IMPLEMENTED => Ok(Response::NotImplemented),
             EVENT_INDEX_MARK => match lines.len() {
-                0 | 1 | 2 => Err(ClientError::TooFewLines),
+                0..=2 => Err(ClientError::TooFewLines),
                 3 => Ok(Response::EventIndexMark(
                     parse_event_id(&lines)?,
                     lines[2].to_owned(),
@@ -178,8 +176,8 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
                 client_name.component
             ),
             Request::Speak => send_one_line!(self, "SPEAK"),
-            Request::SendLine(line) => send_one_line!(self, &line).map(|_| ()),
-            Request::SendLines(lines) => self.send_lines(&lines).await.map(|_| ()),
+            Request::SendLine(line) => send_one_line!(self, &line),
+            Request::SendLines(lines) => self.send_lines(&lines).await,
             Request::SpeakChar(ch) => send_one_line!(self, "CHAR {}", ch),
             Request::SpeakKey(key) => send_one_line!(self, "KEY {}", key),
             Request::Stop(scope) => send_one_line!(self, "STOP {}", scope),
@@ -604,7 +602,8 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
 
     /// Check status of answer, discard lines.
     pub async fn check_status(&mut self, expected_code: ReturnCode) -> ClientResult<&mut Self> {
-        self.receive_answer(None).await.and_then(|status| {
+        let mut lines = Vec::new();
+        self.receive_answer(&mut lines).await.and_then(|status| {
             if status.code == expected_code {
                 Ok(self)
             } else {
@@ -616,7 +615,7 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     /// Receive lines
     pub async fn receive_lines(&mut self, expected_code: ReturnCode) -> ClientResult<Vec<String>> {
         let mut lines = Vec::new();
-        let status = self.receive_answer(Some(&mut lines)).await?;
+        let status = self.receive_answer(&mut lines).await?;
         if status.code == expected_code {
             Ok(lines)
         } else {
@@ -658,7 +657,7 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     /// Receive message id
     pub async fn receive_message_id(&mut self) -> ClientResult<MessageId> {
         let mut lines = Vec::new();
-        match self.receive_answer(Some(&mut lines)).await?.code {
+        match self.receive_answer(&mut lines).await?.code {
             OK_MESSAGE_QUEUED | OK_LAST_MSG => Ok(parse_single_integer(&lines)?),
             _ => Err(ClientError::invalid_data("not a message id")),
         }
@@ -682,32 +681,30 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     /// Receive a notification
     pub async fn receive_event(&mut self) -> ClientResult<Event> {
         let mut lines = Vec::new();
-        self.receive_answer(Some(&mut lines))
-            .await
-            .and_then(|status| {
-                if lines.len() < 2 {
-                    Err(ClientError::unexpected_eof("event truncated"))
-                } else {
-                    let message = &lines[0];
-                    let client = &lines[1];
-                    match status.code {
-                        700 => {
-                            if lines.len() != 3 {
-                                Err(ClientError::unexpected_eof("index markevent truncated"))
-                            } else {
-                                let mark = lines[3].to_owned();
-                                Ok(Event::index_mark(mark, message, client))
-                            }
+        self.receive_answer(&mut lines).await.and_then(|status| {
+            if lines.len() < 2 {
+                Err(ClientError::unexpected_eof("event truncated"))
+            } else {
+                let message = &lines[0];
+                let client = &lines[1];
+                match status.code {
+                    700 => {
+                        if lines.len() != 3 {
+                            Err(ClientError::unexpected_eof("index markevent truncated"))
+                        } else {
+                            let mark = lines[3].to_owned();
+                            Ok(Event::index_mark(mark, message, client))
                         }
-                        701 => Ok(Event::begin(message, client)),
-                        702 => Ok(Event::end(message, client)),
-                        703 => Ok(Event::cancel(message, client)),
-                        704 => Ok(Event::pause(message, client)),
-                        705 => Ok(Event::resume(message, client)),
-                        _ => Err(ClientError::invalid_data("wrong status code for event")),
                     }
+                    701 => Ok(Event::begin(message, client)),
+                    702 => Ok(Event::end(message, client)),
+                    703 => Ok(Event::cancel(message, client)),
+                    704 => Ok(Event::pause(message, client)),
+                    705 => Ok(Event::resume(message, client)),
+                    _ => Err(ClientError::invalid_data("wrong status code for event")),
                 }
-            })
+            }
+        })
     }
 
     /// Receive a list of client status from history.
