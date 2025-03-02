@@ -1,6 +1,6 @@
 extern crate tokio;
-use ssip_client::{
-    fifo::asynchronous_tokio::Builder, types::ClientScope, ClientName, ClientResult,
+use ssip_client_async::{
+    fifo::asynchronous_tokio::Builder, ClientScope, ClientName, ClientResult,
 };
 
 #[cfg(all(unix, feature = "tokio"))]
