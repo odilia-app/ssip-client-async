@@ -7,11 +7,9 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-use std::io::{self, Read, Write};
-
 use crate::constants::*;
 use crate::protocol::{
-    flush_lines, flush_lines_async_std, parse_event_id, parse_single_integer, parse_single_value,
+    flush_lines_async_std, parse_event_id, parse_single_integer, parse_single_value,
     parse_typed_lines, write_lines_async_std,
 };
 use crate::types::*;
@@ -66,7 +64,7 @@ pub struct AsyncClient<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> {
     output: W,
 }
 impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
-    pub(crate) fn new(input: R, output: W) -> Self {
+    pub fn new(input: R, output: W) -> Self {
         Self { input, output }
     }
     /// Send lines of text (terminated by a single dot).
@@ -151,7 +149,7 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
             OK_OUTSIDE_BLOCK => Ok(Response::OutsideBlock),
             OK_NOT_IMPLEMENTED => Ok(Response::NotImplemented),
             EVENT_INDEX_MARK => match lines.len() {
-                0 | 1 | 2 => Err(ClientError::TooFewLines),
+                0..=2 => Err(ClientError::TooFewLines),
                 3 => Ok(Response::EventIndexMark(
                     parse_event_id(&lines)?,
                     lines[2].to_owned(),

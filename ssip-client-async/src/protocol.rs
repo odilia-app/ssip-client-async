@@ -12,8 +12,7 @@ use std::io::{self, BufRead, Write};
 
 #[cfg(any(feature = "async-std", doc))]
 use async_std::io::{
-    prelude::BufReadExt, BufRead as AsyncBufReadStd, Read as AsyncReadStd, ReadExt,
-    Write as AsyncWriteStd, WriteExt,
+    prelude::BufReadExt, BufRead as AsyncBufReadStd, Write as AsyncWriteStd, WriteExt,
 };
 #[cfg(any(feature = "tokio", doc))]
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt};
