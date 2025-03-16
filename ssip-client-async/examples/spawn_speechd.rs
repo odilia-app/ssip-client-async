@@ -1,5 +1,5 @@
 #[cfg(all(unix, not(feature = "async-mio")))]
-use ssip_client_async::{fifo, ClientName, ClientResult, ClientScope, OK_LANGUAGE_SET};
+use ssip_client_async::{fifo, ClientResult};
 
 #[cfg(all(unix, not(feature = "async-mio")))]
 fn main() -> ClientResult<()> {
