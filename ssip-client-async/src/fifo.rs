@@ -55,6 +55,7 @@ mod synchronous {
     use std::io::{self, BufReader, BufWriter};
     pub use std::os::unix::net::UnixStream;
     use std::path::Path;
+    use std::process::Command;
     use std::time::Duration;
 
     use crate::client::Client;
@@ -93,13 +94,24 @@ mod synchronous {
             self
         }
 
+        /// Spawn the speech-dispatcher daemon before creating the client
+        pub fn with_spawn(&self) -> io::Result<&Self> {
+            Command::new("speech-dispatcher")
+                // respect the speechd `DisableAutoSpawn` setting
+                .args(["--spawn"])  
+                .output()?;
+            Ok(self)
+        }
+
         pub fn build(&self) -> io::Result<Client<UnixStream>> {
+
             let input = UnixStream::connect(self.path.get()?)?;
             match self.mode {
                 StreamMode::Blocking => input.set_nonblocking(false)?,
                 StreamMode::NonBlocking => input.set_nonblocking(true)?,
                 StreamMode::TimeOut(timeout) => input.set_read_timeout(Some(timeout))?,
             }
+
             let output = input.try_clone()?;
             Ok(Client::new(BufReader::new(input), BufWriter::new(output)))
         }
