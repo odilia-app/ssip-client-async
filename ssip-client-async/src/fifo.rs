@@ -98,13 +98,12 @@ mod synchronous {
         pub fn with_spawn(&self) -> io::Result<&Self> {
             Command::new("speech-dispatcher")
                 // respect the speechd `DisableAutoSpawn` setting
-                .args(["--spawn"])  
+                .args(["--spawn"])
                 .output()?;
             Ok(self)
         }
 
         pub fn build(&self) -> io::Result<Client<UnixStream>> {
-
             let input = UnixStream::connect(self.path.get()?)?;
             match self.mode {
                 StreamMode::Blocking => input.set_nonblocking(false)?,

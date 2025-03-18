@@ -3,8 +3,7 @@ use ssip_client_async::{fifo, ClientResult};
 
 #[cfg(all(unix, not(feature = "async-mio")))]
 fn main() -> ClientResult<()> {
-
-    // spawn the speech-dispatcher daemon before creating the client 
+    // spawn the speech-dispatcher daemon before creating the client
     // and trying to connect to the speech-dispatcher socket
     let mut client = fifo::Builder::new().with_spawn()?.build()?;
 
