@@ -1,6 +1,7 @@
 Rust SSIP Client
 ================
 
+
 [![license](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](https://gitlab.com/lp-accessibility/ssip-client/raw/main/LICENSE-MIT)
 [![Crates.io Version](https://img.shields.io/crates/v/ssip-client-async.svg)](https://crates.io/crates/ssip-client-async)
 
