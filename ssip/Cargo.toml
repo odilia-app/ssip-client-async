@@ -1,6 +1,6 @@
 [package]
 name = "ssip"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.81.0"
 readme = "README.md"
@@ -17,3 +17,10 @@ keywords = ["ssip", "protocol"]
 [dependencies]
 strum_macros = { version = "0.26", default-features = false }
 thiserror = { version = "2.0", default-features = false }
+zvariant = { version = "5.4.0", optional = true }
+serde = { version = "1.0", optional = true, features = ["derive"] }
+
+[features]
+default = []
+serde = ["dep:serde"]
+dbus = ["serde", "dep:zvariant"]

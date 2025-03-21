@@ -40,6 +40,8 @@ For the tokio API, use:
 ssip-client = { version = "0.9", features = ["tokio"] }
 ```
 
+For use with the `zbus` DBus API, use the `dbus` feature.
+
 Example
 -------
 
