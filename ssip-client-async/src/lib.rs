@@ -36,9 +36,9 @@ pub mod client;
 pub mod constants;
 #[cfg(unix)]
 pub mod fifo;
+pub mod language_detection;
 pub mod net;
 pub mod tcp;
-pub mod language_detection;
 
 #[cfg(any(not(feature = "async-mio"), doc))]
 pub use client::Client;

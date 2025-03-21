@@ -6,7 +6,10 @@ fn main() -> ClientResult<()> {
     // spawn the speech-dispatcher daemon before creating the client
     // and trying to connect to the speech-dispatcher socket
     let languages = vec![lingua::IsoCode639_3::ENG, lingua::IsoCode639_3::SPA];
-    let mut client = fifo::Builder::new().with_language_detection(&languages).with_spawn()?.build()?;
+    let mut client = fifo::Builder::new()
+        .with_language_detection(&languages)
+        .with_spawn()?
+        .build()?;
 
     client
         .speak()?

@@ -66,7 +66,7 @@ mod synchronous {
     pub struct Builder {
         path: FifoPath,
         mode: StreamMode,
-        pub language_detector_model: Option<lingua::LanguageDetector>
+        pub language_detector_model: Option<lingua::LanguageDetector>,
     }
 
     impl Builder {
@@ -74,7 +74,7 @@ mod synchronous {
             Self {
                 path: FifoPath::new(),
                 mode: StreamMode::Blocking,
-                language_detector_model: None
+                language_detector_model: None,
             }
         }
 
@@ -104,7 +104,7 @@ mod synchronous {
                 .output()?;
             Ok(self)
         }
- 
+
         pub fn build(&self) -> io::Result<Client<UnixStream>> {
             let input = UnixStream::connect(self.path.get()?)?;
             match self.mode {

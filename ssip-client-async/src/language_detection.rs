@@ -22,11 +22,8 @@ impl Builder {
 }
 
 impl<S: Read + Write + Source> Client<S> {
-
-
     /// A wrapper over the `send_lines` method to send lines in multiple languages
     pub fn send_lines_multilingual(&mut self, lines: &[String]) -> ClientResult<()> {
-
         Ok(())
     }
 }
