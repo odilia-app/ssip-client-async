@@ -55,7 +55,7 @@ let msg_id = client.speak()?.send_line("hello")?.receive_message_id()?;
 client.quit()?;
 ```
 
-See [other examples](https://github.com/odilia-app/ssip-client-async/tree/main/examples) in the repository.
+See [other examples](./ssip-client-async/examples) in the repository.
 
 License
 -------
