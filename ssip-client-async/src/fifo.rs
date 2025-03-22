@@ -105,7 +105,7 @@ mod synchronous {
             Ok(self)
         }
 
-        pub fn build(&self) -> io::Result<Client<UnixStream>> {
+        pub fn build(self) -> io::Result<Client<UnixStream>> {
             let input = UnixStream::connect(self.path.get()?)?;
             match self.mode {
                 StreamMode::Blocking => input.set_nonblocking(false)?,
@@ -114,7 +114,7 @@ mod synchronous {
             }
 
             let output = input.try_clone()?;
-            Ok(Client::new(BufReader::new(input), BufWriter::new(output)))
+            Ok(Client::new(BufReader::new(input), BufWriter::new(output), self.language_detector_model.take()))
         }
     }
 }
