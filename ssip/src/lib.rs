@@ -67,6 +67,8 @@ impl fmt::Display for ClientScope {
 
 /// Priority
 #[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum Priority {
     #[strum(serialize = "progress")]
     Progress,
@@ -82,6 +84,8 @@ pub enum Priority {
 
 /// Punctuation mode.
 #[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum PunctuationMode {
     #[strum(serialize = "none")]
     None,
@@ -95,6 +99,8 @@ pub enum PunctuationMode {
 
 /// Capital letters recognition mode.
 #[derive(StrumDisplay, Debug, Clone, Hash, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum CapitalLettersRecognitionMode {
     #[strum(serialize = "none")]
     None,
@@ -106,6 +112,8 @@ pub enum CapitalLettersRecognitionMode {
 
 /// Symbolic key names
 #[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum KeyName {
     #[strum(serialize = "space")]
     Space,
@@ -253,6 +261,8 @@ pub enum KeyName {
 
 /// Notification type
 #[derive(StrumDisplay, Debug, Clone, Hash, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum NotificationType {
     #[strum(serialize = "begin")]
     Begin,
@@ -283,6 +293,8 @@ pub enum EventType {
 
 /// Event identifier
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub struct EventId {
     // Message id
     pub message: String,
@@ -392,6 +404,8 @@ impl FromStr for SynthesisVoice {
 /// - 216 OK OUTPUT MODULE SET
 /// - 409 ERR RATE TOO HIGH
 #[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub struct StatusLine {
     pub code: ReturnCode,
     pub message: String,
@@ -454,6 +468,8 @@ pub type ClientStatus = ClientResult<StatusLine>;
 
 /// Client name
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub struct ClientName {
     pub user: String,
     pub application: String,
@@ -476,6 +492,8 @@ impl ClientName {
 
 /// Cursor motion in history
 #[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum CursorDirection {
     #[strum(serialize = "backward")]
     Backward,
@@ -485,6 +503,8 @@ pub enum CursorDirection {
 
 /// Sort direction in history
 #[derive(StrumDisplay, Debug, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum SortDirection {
     #[strum(serialize = "asc")]
     Ascending,
@@ -494,6 +514,8 @@ pub enum SortDirection {
 
 /// Property messages are ordered by in history
 #[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum SortKey {
     #[strum(serialize = "client_name")]
     ClientName,
@@ -509,6 +531,8 @@ pub enum SortKey {
 
 /// Sort ordering
 #[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum Ordering {
     #[strum(serialize = "text")]
     Text,
@@ -540,6 +564,8 @@ impl fmt::Display for HistoryPosition {
 
 /// History client status
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub struct HistoryClientStatus {
     pub id: ClientId,
     pub name: String,
