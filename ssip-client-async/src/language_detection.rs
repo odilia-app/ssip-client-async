@@ -34,7 +34,8 @@ impl<S: Read + Write + Source> Client<S> {
         for result in detection_results {
             let language_code = result.language().iso_code_639_1().to_string();
             // the status check stalls for some reason and never returns
-            self.set_language(ssip::ClientScope::Current, &language_code)?.check_status(OK_LANGUAGE_SET)?;
+            self.set_language(ssip::ClientScope::Current, &language_code)?
+                .check_status(OK_LANGUAGE_SET)?;
             let subsection = lines[result.start_index()..result.end_index()].to_string();
             self.send_lines(&[subsection])?.receive()?;
         }

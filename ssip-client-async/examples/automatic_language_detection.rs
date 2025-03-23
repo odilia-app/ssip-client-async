@@ -19,9 +19,7 @@ fn main() -> ClientResult<()> {
         .check_client_name_set()?
         .speak()?
         .check_receiving_data()?
-        .send_lines_multilingual(
-            &"Hello, my name is Joe. меня зовут джо".to_string(),
-        )?;
+        .send_lines_multilingual(&"Hello, my name is Joe. меня зовут джо".to_string())?;
 
     client.quit()?.receive()?;
     Ok(())
