@@ -66,7 +66,7 @@ mod synchronous {
     pub struct Builder {
         path: FifoPath,
         mode: StreamMode,
-        pub language_detector_model: Option<lingua::LanguageDetector>,
+        pub languages_to_detect: Option<Vec<lingua::IsoCode639_1>>,
     }
 
     impl Builder {
@@ -74,7 +74,7 @@ mod synchronous {
             Self {
                 path: FifoPath::new(),
                 mode: StreamMode::Blocking,
-                language_detector_model: None,
+                languages_to_detect: None,
             }
         }
 
@@ -105,6 +105,17 @@ mod synchronous {
             Ok(self)
         }
 
+        fn init_language_detector(
+            languages: &Vec<lingua::IsoCode639_1>,
+        ) -> Option<lingua::LanguageDetector> {
+            Some(
+                lingua::LanguageDetectorBuilder::from_iso_codes_639_1(languages)
+                    // preload all language models into memory for faster client detection
+                    .with_preloaded_language_models()
+                    .build(),
+            )
+        }
+
         pub fn build(&self) -> io::Result<Client<UnixStream>> {
             let input = UnixStream::connect(self.path.get()?)?;
             match self.mode {
@@ -114,7 +125,21 @@ mod synchronous {
             }
 
             let output = input.try_clone()?;
-            Ok(Client::new(BufReader::new(input), BufWriter::new(output)))
+            match &self.languages_to_detect {
+                Some(languages) => {
+                    let language_detector = Self::init_language_detector(&languages).unwrap();
+                    Ok(Client::new(
+                        BufReader::new(input),
+                        BufWriter::new(output),
+                        Some(language_detector),
+                    ))
+                }
+                None => Ok(Client::new(
+                    BufReader::new(input),
+                    BufWriter::new(output),
+                    None,
+                )),
+            }
         }
     }
 }

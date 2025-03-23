@@ -58,7 +58,11 @@ mod synchronous {
                 StreamMode::TimeOut(timeout) => input.set_read_timeout(Some(timeout))?,
             }
             let output = input.try_clone()?;
-            Ok(Client::new(BufReader::new(input), BufWriter::new(output)))
+            Ok(Client::new(
+                BufReader::new(input),
+                BufWriter::new(output),
+                None,
+            ))
         }
     }
 }

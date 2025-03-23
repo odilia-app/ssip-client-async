@@ -417,6 +417,8 @@ pub enum ClientError {
     TooManyLines,
     #[error("Unexpected status: {0}")]
     UnexpectedStatus(ReturnCode),
+    #[error("Failure automatically detecting language: {0}")]
+    LanguageDetectionError(String),
 }
 
 impl ClientError {
