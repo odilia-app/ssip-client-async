@@ -20,7 +20,7 @@ impl Builder {
 }
 
 impl<S: Read + Write + Source> Client<S> {
-    /// A wrapper over the `send_lines` method to send lines in multiple languages
+    /// A wrapper over the `send_lines` method to send lines in multiple languages. Uses whatever languages were set when the client was built
     pub fn send_lines_multilingual(&mut self, lines: &String) -> ClientResult<&mut Self> {
         let detector =
             self.language_detector
@@ -37,7 +37,10 @@ impl<S: Read + Write + Source> Client<S> {
             self.set_language(ssip::ClientScope::Current, &language_code)?
                 .check_status(OK_LANGUAGE_SET)?;
             let subsection = lines[result.start_index()..result.end_index()].to_string();
-            self.send_lines(&[subsection])?.receive()?;
+            self.speak()?
+                .check_receiving_data()?
+                .send_lines(&[subsection])?
+                .receive()?;
         }
 
         Ok(self)
