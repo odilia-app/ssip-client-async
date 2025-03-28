@@ -20,6 +20,7 @@ use crate::types::*;
 #[cfg(all(not(feature = "async-mio"), unix))]
 pub use std::os::unix::io::AsRawFd as Source;
 
+use lingua::LanguageDetector;
 #[cfg(feature = "async-mio")]
 pub use mio::event::Source;
 
@@ -69,13 +70,22 @@ macro_rules! send_range {
 pub struct Client<S: Read + Write + Source> {
     input: io::BufReader<S>,
     output: io::BufWriter<S>,
+    pub language_detector: Option<LanguageDetector>,
 }
 
 impl<S: Read + Write + Source> Client<S> {
     /// Create a SSIP client on the reader and writer.
-    pub(crate) fn new(input: io::BufReader<S>, output: io::BufWriter<S>) -> Self {
+    pub(crate) fn new(
+        input: io::BufReader<S>,
+        output: io::BufWriter<S>,
+        language_detector: Option<LanguageDetector>,
+    ) -> Self {
         // https://stackoverflow.com/questions/58467659/how-to-store-tcpstream-with-bufreader-and-bufwriter-in-a-data-structure
-        Self { input, output }
+        Self {
+            input,
+            output,
+            language_detector,
+        }
     }
 
     #[cfg(all(not(feature = "async-mio"), unix))]

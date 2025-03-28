@@ -36,6 +36,7 @@ pub mod client;
 pub mod constants;
 #[cfg(unix)]
 pub mod fifo;
+pub mod language_detection;
 pub mod net;
 pub mod tcp;
 
