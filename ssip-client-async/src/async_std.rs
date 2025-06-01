@@ -14,7 +14,7 @@ use crate::protocol::{
 };
 use crate::types::*;
 
-use async_std::io::{BufRead as AsyncBufRead, Write as AsyncWrite};
+use smol::io::{AsyncBufReadExt as AsyncBufRead, AsyncWriteExt as AsyncWrite};
 
 /// Convert boolean to ON or OFF
 fn on_off(value: bool) -> &'static str {

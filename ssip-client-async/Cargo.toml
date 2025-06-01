@@ -14,22 +14,21 @@ repository = "https://github.com/odilia-app/ssip-client-async/"
 ssip = { version = "0.3.0", path = "../ssip" }
 dirs = "4"
 log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
-mio = { version = "0.8", optional = true }
-tokio = { version = "1.0", features = ["io-util", "rt", "macros", "net"] }
-async-std = { version = "1.0", default-features = true }
+mio = { version = "1.0", optional = true }
+tokio = { version = "1.0", features = ["io-util", "rt", "macros", "net"], optional = true }
+smol = { version = "2.0", default-features = true, optional = true }
 
 [features]
 dbus = ["ssip/dbus"]
 serde = ["ssip/serde"]
 async-mio = ["mio/net", "mio/os-poll"]
-tokio = ["tokio/io-util", "tokio/rt", "tokio/macros"]
-async-std = ["async-std/default"]
+tokio = ["dep:tokio"]
+async-io = ["dep:smol"]
 
 [dev-dependencies]
-mio = { version = "0.8", features = ["os-poll", "os-ext"] }
+mio = { version = "1.0", features = ["os-poll", "os-ext"] }
 tokio = { version = "1.0", features = ["io-util", "rt"] }
-ssip-client-async = { path = ".", features = ["tokio", "async-std"] }
-async-std = { version = "1.0", default-features = true }
+ssip-client-async = { path = ".", features = ["tokio", "async-io"] }
 lazy_static = "1"
 popol = "1"
 tempfile = "3"

@@ -10,10 +10,8 @@
 use log::debug;
 use std::io::{self, BufRead, Write};
 
-#[cfg(any(feature = "async-std", doc))]
-use async_std::io::{
-    prelude::BufReadExt, BufRead as AsyncBufReadStd, Write as AsyncWriteStd, WriteExt,
-};
+#[cfg(any(feature = "async-io", doc))]
+use smol::io::{AsyncBufReadExt as AsyncBufReadStd, AsyncWriteExt as AsyncWriteStd};
 #[cfg(any(feature = "tokio", doc))]
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt};
 
@@ -95,7 +93,7 @@ pub(crate) async fn write_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
     Ok(())
 }
 /// Write lines (asyncronously) separated by CRLF.
-#[cfg(any(feature = "async-std", doc))]
+#[cfg(any(feature = "async-io", doc))]
 pub(crate) async fn write_lines_async_std<W: AsyncWriteStd + Unpin + ?Sized>(
     output: &mut W,
     lines: &[&str],
@@ -125,7 +123,7 @@ pub(crate) async fn flush_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
     Ok(())
 }
 /// Write lines separated by CRLF and flush the output asyncronously.
-#[cfg(any(feature = "async-std", doc))]
+#[cfg(any(feature = "async-io", doc))]
 pub(crate) async fn flush_lines_async_std<W: AsyncWriteStd + Unpin + ?Sized>(
     output: &mut W,
     lines: &[&str],
@@ -183,7 +181,7 @@ pub(crate) async fn receive_answer_tokio<W: AsyncBufRead + Unpin + ?Sized>(
     }
 }
 /// Read lines from server until a status line is found.
-#[cfg(any(feature = "async-std", doc))]
+#[cfg(any(feature = "async-io", doc))]
 pub(crate) async fn receive_answer_async_std<W: AsyncBufReadStd + Unpin + ?Sized>(
     input: &mut W,
     mut lines: Option<&mut Vec<String>>,
