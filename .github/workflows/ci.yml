@@ -93,8 +93,9 @@ jobs:
         with:
           components: clippy
           toolchain: nightly
+      - uses: taiki-e/install-action@cargo-hack
       - name: Clippy
-        run: cargo clippy --tests --workspace --no-deps -- -D warnings 
+        run: cargo hack --feature-powerset clippy --examples --benches --tests --workspace --no-deps -- -D warnings 
   tests:
     runs-on: ubuntu-latest
     needs: [clippy,no-unused-dependencies]
