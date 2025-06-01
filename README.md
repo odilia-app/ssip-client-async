@@ -1,16 +1,10 @@
 Rust SSIP Client
 ================
 
-[![license](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](https://gitlab.com/lp-accessibility/ssip-client/raw/main/LICENSE-MIT)
+[![license](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](https://github.com/odilia-app/ssip-client-async/blob/main/LICENSE-MIT)
 [![Crates.io Version](https://img.shields.io/crates/v/ssip-client-async.svg)](https://crates.io/crates/ssip-client-async)
 
 Speech Dispatcher [SSIP client library](http://htmlpreview.github.io/?https://github.com/brailcom/speechd/blob/master/doc/ssip.html) in pure rust.
-
-The API is synchronous by default.
-
-A non-blocking API can be used with a low-level polling mechanism based on `poll`, or
-with [mio](https://github.com/tokio-rs/mio).
-This fork also offers a working version using the `tokio` or `smol` (for `async-io`).
 
 - [x] Unix socket.
 - [x] TCP socket.
@@ -21,31 +15,23 @@ This fork also offers a working version using the `tokio` or `smol` (for `async-
 - [x] Message history.
 - [x] `tokio` support.
 - [x] `smol`/`async-io` support.
+- [x] separate protocol driving mechanism in the `ssip` crate.
 
-Getting Started
+Feature Flags
 ---------------
 
-To use the synchronous API or an asynchronous API compatible with low-level crates based on `poll`, use:
-
-```toml
-[dependencies]
-ssip-client-async = "0.9"
-```
-
-For the tokio API, use:
-
-```toml
-[dependencies]
-ssip-client = { version = "0.9", features = ["tokio"] }
-```
-
-For use with the `zbus` DBus API, use the `dbus` feature.
+- `default`: none.
+- `dbus`: add support to send these types over DBus via the `zbus` crate.
+- `serde`: add support to serialize/deserialize the types with `serde`.
+- `smol`: add support for the `smol`/`async-io` runtime. This _does not pull in an entire runtime, it only adds integration points_.
+- `tokio`: add support for the `tokio` runtime. This will pull in the `tokio` runtime along with support for its `tokio::io::Async*` traits.
+- `async-mio`: add support for the low-level `mio` polling mechanism.
 
 Example
 -------
 
 ```rust
-use ssip_client::{FifoBuilder, ClientName};
+use ssip_client_async::{FifoBuilder, ClientName};
 let mut client = fifo::Builder::new().build()?;
 client
     .set_client_name(ClientName::new("joe", "hello"))?
