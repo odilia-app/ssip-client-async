@@ -12,7 +12,7 @@ repository = "https://github.com/odilia-app/ssip-client-async/"
 
 [dependencies]
 ssip = { version = "0.3.0", path = "../ssip" }
-dirs = "4"
+dirs = "6"
 log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
 mio = { version = "1.0", optional = true }
 tokio = { version = "1.0", features = ["io-util", "rt", "macros", "net"], optional = true }
