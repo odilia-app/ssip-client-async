@@ -16,7 +16,7 @@ use std::{
 };
 
 #[cfg(feature = "async-mio")]
-use ssip_client::{client::Source, *};
+use ssip_client_async::{client::Source, *};
 
 #[cfg(feature = "async-mio")]
 mod server;
@@ -72,8 +72,8 @@ impl<'a, 'b> State<'a, 'b> {
 fn basic_async_client_communication<S: Read + Write + Source>(
     client: &mut QueuedClient<S>,
 ) -> ClientResult<usize> {
-    let get_requests = vec![Request::GetOutputModule, Request::GetRate];
-    let get_answers = vec!["espeak", "10"];
+    let get_requests = [Request::GetOutputModule, Request::GetRate];
+    let get_answers = ["espeak", "10"];
     let mut state = State::new(get_requests.iter(), get_answers.iter());
 
     let mut poll = Poll::new()?;
@@ -98,7 +98,7 @@ fn basic_async_client_communication<S: Read + Write + Source>(
                     Response::LanguageSet => client.push(Request::Stop(MessageScope::Last)),
                     Response::Stopped => state.start_get = true,
                     Response::Get(val) => state.assert_answer(&val),
-                    result => panic!("Unexpected response: {:?}", result),
+                    result => panic!("Unexpected response: {result:?}"),
                 }
                 if let Some(request) = state.next_request() {
                     client.push(request.clone());

@@ -60,12 +60,12 @@ fn main() -> ClientResult<()> {
                     0 => return Ok(()),
                     1 => {
                         if let Some(ch) = text.chars().next() {
-                            println!("sending char: {}", ch);
+                            println!("sending char: {ch}");
                             ssip_client.push(Request::SpeakChar(ch))
                         }
                     }
                     _ => {
-                        println!("sending line: {}", text);
+                        println!("sending line: {text}");
                         send_requests.push_back(Request::SendLine(text.to_owned()));
                         ssip_client.push(Request::Speak);
                     }
@@ -74,14 +74,14 @@ fn main() -> ClientResult<()> {
             } else if token == speech_input_token {
                 match ssip_client.receive_next() {
                     Err(ClientError::Io(err)) => return Err(ClientError::from(err)),
-                    Err(ClientError::Ssip(err)) => eprintln!("SSIP error: {:?}", err),
+                    Err(ClientError::Ssip(err)) => eprintln!("SSIP error: {err:?}"),
                     Err(_) => panic!("internal error"),
                     Ok(result) => match result {
                         Response::MessageQueued | Response::ClientNameSet => (),
                         Response::ReceivingData => {
                             ssip_client.push(send_requests.pop_front().unwrap())
                         }
-                        _ => panic!("Unexpected response: {:?}", result),
+                        _ => panic!("Unexpected response: {result:?}"),
                     },
                 }
             } else if token == speech_output_token {

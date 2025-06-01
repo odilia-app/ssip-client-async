@@ -19,7 +19,7 @@ fn main() -> ClientResult<()> {
         .check_receiving_data()?
         .send_line("hello")?
         .receive_message_id()?;
-    println!("message identifier: {}", msg_id);
+    println!("message identifier: {msg_id}");
     loop {
         // Waiting for event
         match client.receive_event() {
@@ -33,7 +33,7 @@ fn main() -> ClientResult<()> {
                 }
             }
             Err(err) => {
-                eprintln!("error: {:?}", err);
+                eprintln!("error: {err:?}");
                 break;
             }
         }

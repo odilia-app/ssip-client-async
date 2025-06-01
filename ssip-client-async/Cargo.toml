@@ -1,36 +1,35 @@
 [package]
 name = "ssip-client-async"
-version = "0.15.0"
+version = "0.16.0"
 rust-version = "1.81.0"
 authors = ["Laurent Pelecq <lpelecq+rust@circoise.eu>", "Tait Hoyem <tait@tait.tech>"]
 edition = "2021"
 description = "Client API for Speech Dispatcher"
+readme = "../README.md"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/odilia-app/ssip-client-async/"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ssip = { version = "0.3.0", path = "../ssip" }
-dirs = "4"
+ssip = { version = "0.4.0", path = "../ssip" }
+dirs = "6"
 log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
-mio = { version = "0.8", optional = true }
-tokio = { version = "1.0", features = ["io-util", "rt", "macros", "net"] }
-async-std = { version = "1.0", default-features = true }
+mio = { version = "1.0", optional = true }
+tokio = { version = "1.0", features = ["io-util", "rt", "macros", "net"], optional = true }
+smol = { version = "2.0", default-features = true, optional = true }
 
 [features]
 dbus = ["ssip/dbus"]
 serde = ["ssip/serde"]
 async-mio = ["mio/net", "mio/os-poll"]
-tokio = ["tokio/io-util", "tokio/rt", "tokio/macros"]
-async-std = ["async-std/default"]
+tokio = ["dep:tokio"]
+smol = ["dep:smol"]
 
 [dev-dependencies]
-mio = { version = "0.8", features = ["os-poll", "os-ext"] }
+mio = { version = "1.0", features = ["os-poll", "os-ext"] }
 tokio = { version = "1.0", features = ["io-util", "rt"] }
-ssip-client-async = { path = ".", features = ["tokio", "async-std"] }
-async-std = { version = "1.0", default-features = true }
+ssip-client-async = { path = ".", features = ["tokio", "smol"] }
 lazy_static = "1"
 popol = "1"
 tempfile = "3"
-

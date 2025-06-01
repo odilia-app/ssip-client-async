@@ -17,7 +17,7 @@ fn split_lines(lines: &str) -> Vec<String> {
     lines
         .trim_end()
         .split("\r\n")
-        .map(|s| format!("{}\r\n", s))
+        .map(|s| format!("{s}\r\n"))
         .collect::<Vec<String>>()
 }
 

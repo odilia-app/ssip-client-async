@@ -2,7 +2,6 @@ use ssip_client_async::{
     fifo::asynchronous_tokio::Builder,
     types::{ClientName, ClientResult, ClientScope},
 };
-use tokio;
 
 #[cfg(all(unix, feature = "tokio"))]
 #[tokio::main(flavor = "current_thread")]
@@ -25,20 +24,20 @@ async fn main() -> ClientResult<()> {
         .await?
         .receive_message_id()
         .await?;
-    println!("message: {}", msg_id);
+    println!("message: {msg_id}");
     let volume = client.get_volume().await?.receive_u8().await?;
-    println!("volume: {}", volume);
+    println!("volume: {volume}");
     match client
         .set_volume(ClientScope::Current, 1)
         .await?
         .receive()
         .await
     {
-        Ok(id) => println!("Volume change ID: {:?}", id),
-        Err(e) => println!("Error: {:?}", e),
+        Ok(id) => println!("Volume change ID: {id:?}"),
+        Err(e) => println!("Error: {e:?}"),
     };
     let volume = client.get_volume().await?.receive_u8().await?;
-    println!("volume: {}", volume);
+    println!("volume: {volume}");
     let msg_id = client
         .speak()
         .await?
@@ -48,7 +47,7 @@ async fn main() -> ClientResult<()> {
         .await?
         .receive_message_id()
         .await?;
-    println!("id2: {}", msg_id);
+    println!("id2: {msg_id}");
     client.quit().await?.receive().await?;
     Ok(())
 }
