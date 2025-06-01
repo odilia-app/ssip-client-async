@@ -63,7 +63,7 @@ impl<S: Read + Write + Source> QueuedClient<S> {
         self.client.output_source()
     }
 
-    #[cfg(any(feature = "async-mio", doc))]
+    #[cfg(feature = "async-mio")]
     /// Register client
     pub fn register(
         &mut self,

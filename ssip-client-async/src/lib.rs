@@ -39,12 +39,12 @@ pub mod fifo;
 pub mod net;
 pub mod tcp;
 
-#[cfg(any(not(feature = "async-mio"), doc))]
+#[cfg(not(feature = "async-mio"))]
 pub use client::Client;
 
-#[cfg(any(feature = "smol", doc))]
+#[cfg(feature = "smol")]
 pub mod smol;
-#[cfg(any(feature = "tokio", doc))]
+#[cfg(feature = "tokio")]
 pub mod tokio;
 
 pub use constants::*;

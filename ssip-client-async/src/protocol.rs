@@ -10,9 +10,9 @@
 use log::debug;
 use std::io::{self, BufRead, Write};
 
-#[cfg(any(feature = "smol", doc))]
+#[cfg(feature = "smol")]
 use smol::io::{AsyncBufReadExt as AsyncBufReadSmol, AsyncWriteExt as AsyncWriteSmol};
-#[cfg(any(feature = "tokio", doc))]
+#[cfg(feature = "tokio")]
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt};
 
 use std::str::FromStr;
@@ -80,7 +80,7 @@ pub(crate) fn write_lines<W: Write + ?Sized>(output: &mut W, lines: &[&str]) -> 
 }
 
 /// Write lines (asyncronously) separated by CRLF.
-#[cfg(any(feature = "tokio", doc))]
+#[cfg(feature = "tokio")]
 pub(crate) async fn write_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
     output: &mut W,
     lines: &[&str],
@@ -93,7 +93,7 @@ pub(crate) async fn write_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
     Ok(())
 }
 /// Write lines (asyncronously) separated by CRLF.
-#[cfg(any(feature = "smol", doc))]
+#[cfg(feature = "smol")]
 pub(crate) async fn write_lines_smol<W: AsyncWriteSmol + Unpin + ?Sized>(
     output: &mut W,
     lines: &[&str],
@@ -113,7 +113,7 @@ pub(crate) fn flush_lines<W: Write + ?Sized>(output: &mut W, lines: &[&str]) -> 
     Ok(())
 }
 /// Write lines separated by CRLF and flush the output asyncronously.
-#[cfg(any(feature = "tokio", doc))]
+#[cfg(feature = "tokio")]
 pub(crate) async fn flush_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
     output: &mut W,
     lines: &[&str],
@@ -123,7 +123,7 @@ pub(crate) async fn flush_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
     Ok(())
 }
 /// Write lines separated by CRLF and flush the output asyncronously.
-#[cfg(any(feature = "smol", doc))]
+#[cfg(feature = "smol")]
 pub(crate) async fn flush_lines_smol<W: AsyncWriteSmol + Unpin + ?Sized>(
     output: &mut W,
     lines: &[&str],
@@ -152,7 +152,7 @@ fn parse_status_line(code: u16, line: &str) -> ClientStatus {
 }
 
 /// Read lines from server until a status line is found.
-#[cfg(any(feature = "tokio", doc))]
+#[cfg(feature = "tokio")]
 pub(crate) async fn receive_answer_tokio<W: AsyncBufRead + Unpin + ?Sized>(
     input: &mut W,
     mut lines: Option<&mut Vec<String>>,
@@ -181,7 +181,7 @@ pub(crate) async fn receive_answer_tokio<W: AsyncBufRead + Unpin + ?Sized>(
     }
 }
 /// Read lines from server until a status line is found.
-#[cfg(any(feature = "smol", doc))]
+#[cfg(feature = "smol")]
 pub(crate) async fn receive_answer_smol<W: AsyncBufReadSmol + Unpin + ?Sized>(
     input: &mut W,
     mut lines: Option<&mut Vec<String>>,

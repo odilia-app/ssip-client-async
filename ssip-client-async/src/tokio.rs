@@ -42,6 +42,7 @@ macro_rules! send_range {
     };
 }
 
+#[cfg(feature = "tokio")]
 use tokio::io::{AsyncBufRead, AsyncWrite};
 
 /// Convert boolean to ON or OFF
