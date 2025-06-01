@@ -72,7 +72,7 @@ where
 /// Write lines separated by CRLF.
 pub(crate) fn write_lines<W: Write + ?Sized>(output: &mut W, lines: &[&str]) -> ClientResult<()> {
     for line in lines.iter() {
-        debug!("SSIP(out): {}", line);
+        debug!("SSIP(out): {line}");
         output.write_all(line.as_bytes())?;
         output.write_all(b"\r\n")?;
     }
@@ -86,7 +86,7 @@ pub(crate) async fn write_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
     lines: &[&str],
 ) -> ClientResult<()> {
     for line in lines.iter() {
-        debug!("SSIP(out): {}", line);
+        debug!("SSIP(out): {line}");
         output.write_all(line.as_bytes()).await?;
         output.write_all(b"\r\n").await?;
     }
@@ -99,7 +99,7 @@ pub(crate) async fn write_lines_smol<W: AsyncWriteSmol + Unpin + ?Sized>(
     lines: &[&str],
 ) -> ClientResult<()> {
     for line in lines.iter() {
-        debug!("SSIP(out): {}", line);
+        debug!("SSIP(out): {line}");
         output.write_all(line.as_bytes()).await?;
         output.write_all(b"\r\n").await?;
     }
@@ -272,7 +272,7 @@ mod tests {
                 assert_eq!(409, status.code);
                 assert_eq!("RATE TOO HIGH", status.message);
             }
-            err => panic!("{}: invalid error", err),
+            err => panic!("{err}: invalid error"),
         }
     }
 

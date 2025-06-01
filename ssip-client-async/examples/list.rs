@@ -17,9 +17,9 @@ fn main() -> ClientResult<()> {
     }
 
     fn print_list(title: &str, values: &[String]) {
-        println!("{}:", title);
+        println!("{title}:");
         for val in values {
-            println!("- {}", val);
+            println!("- {val}");
         }
     }
 

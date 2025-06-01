@@ -98,7 +98,7 @@ fn basic_async_client_communication<S: Read + Write + Source>(
                     Response::LanguageSet => client.push(Request::Stop(MessageScope::Last)),
                     Response::Stopped => state.start_get = true,
                     Response::Get(val) => state.assert_answer(&val),
-                    result => panic!("Unexpected response: {:?}", result),
+                    result => panic!("Unexpected response: {result:?}"),
                 }
                 if let Some(request) = state.next_request() {
                     client.push(request.clone());

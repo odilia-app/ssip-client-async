@@ -14,9 +14,9 @@ fn main() -> ClientResult<()> {
         .check_receiving_data()?
         .send_line("你好")?
         .receive_message_id()?;
-    println!("message: {}", msg_id);
+    println!("message: {msg_id}");
     let volume = client.get_volume()?.receive_u8()?;
-    println!("volume: {}", volume);
+    println!("volume: {volume}");
     client.quit()?.receive()?;
     Ok(())
 }

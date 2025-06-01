@@ -39,7 +39,7 @@ impl fmt::Display for MessageScope {
         match self {
             MessageScope::Last => write!(f, "self"),
             MessageScope::All => write!(f, "all"),
-            MessageScope::Message(id) => write!(f, "{}", id),
+            MessageScope::Message(id) => write!(f, "{id}"),
         }
     }
 }
@@ -60,7 +60,7 @@ impl fmt::Display for ClientScope {
         match self {
             ClientScope::Current => write!(f, "self"),
             ClientScope::All => write!(f, "all"),
-            ClientScope::Client(id) => write!(f, "{}", id),
+            ClientScope::Client(id) => write!(f, "{id}"),
         }
     }
 }
@@ -557,7 +557,7 @@ impl fmt::Display for HistoryPosition {
         match self {
             HistoryPosition::First => write!(f, "first"),
             HistoryPosition::Last => write!(f, "last"),
-            HistoryPosition::Pos(n) => write!(f, "pos {}", n),
+            HistoryPosition::Pos(n) => write!(f, "pos {n}"),
         }
     }
 }
@@ -779,14 +779,14 @@ mod tests {
             match HistoryClientStatus::from_str(line) {
                 Ok(_) => panic!("parsing should have failed"),
                 Err(ClientError::Io(err)) if err.kind() == io::ErrorKind::InvalidData => (),
-                Err(_) => panic!("expecting error 'invalid data' parsing \"{}\"", line),
+                Err(_) => panic!("expecting error 'invalid data' parsing \"{line}\""),
             }
         }
         for line in &["8 joe:speechd_client:main", "8", ""] {
             match HistoryClientStatus::from_str(line) {
                 Ok(_) => panic!("parsing should have failed"),
                 Err(ClientError::Io(err)) if err.kind() == io::ErrorKind::UnexpectedEof => (),
-                Err(_) => panic!("expecting error 'unexpected EOF' parsing \"{}\"", line),
+                Err(_) => panic!("expecting error 'unexpected EOF' parsing \"{line}\""),
             }
         }
     }
