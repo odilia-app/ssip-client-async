@@ -2,7 +2,6 @@ use ssip_client_async::{
     fifo::asynchronous_tokio::Builder,
     types::{ClientName, ClientResult, ClientScope},
 };
-use tokio;
 
 #[cfg(all(unix, feature = "tokio"))]
 #[tokio::main(flavor = "current_thread")]
