@@ -10,7 +10,7 @@ The API is synchronous by default.
 
 A non-blocking API can be used with a low-level polling mechanism based on `poll`, or
 with [mio](https://github.com/tokio-rs/mio).
-This fork also offers a working version using the `tokio` flag, or an occasionally working `async-std` flag.
+This fork also offers a working version using the `tokio` or `smol` (for `async-io`).
 
 - [x] Unix socket.
 - [x] TCP socket.
@@ -20,8 +20,7 @@ This fork also offers a working version using the `tokio` flag, or an occasional
 - [x] Notifications.
 - [x] Message history.
 - [x] `tokio` support.
-- [ ] `async-std` support.
-	- If you're interested in helping us implement this, please reach out [on Gituhb](https://github.com/odilia-app/ssip-client-async/issues).
+- [x] `smol`/`async-io` support.
 
 Getting Started
 ---------------

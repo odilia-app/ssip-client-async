@@ -23,12 +23,12 @@ dbus = ["ssip/dbus"]
 serde = ["ssip/serde"]
 async-mio = ["mio/net", "mio/os-poll"]
 tokio = ["dep:tokio"]
-async-io = ["dep:smol"]
+smol = ["dep:smol"]
 
 [dev-dependencies]
 mio = { version = "1.0", features = ["os-poll", "os-ext"] }
 tokio = { version = "1.0", features = ["io-util", "rt"] }
-ssip-client-async = { path = ".", features = ["tokio", "async-io"] }
+ssip-client-async = { path = ".", features = ["tokio", "smol"] }
 lazy_static = "1"
 popol = "1"
 tempfile = "3"

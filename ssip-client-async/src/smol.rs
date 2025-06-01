@@ -9,8 +9,8 @@
 
 use crate::constants::*;
 use crate::protocol::{
-    flush_lines_async_std, parse_event_id, parse_single_integer, parse_single_value,
-    parse_typed_lines, write_lines_async_std,
+    flush_lines_smol, parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines,
+    write_lines_smol,
 };
 use crate::types::*;
 
@@ -27,10 +27,10 @@ fn on_off(value: bool) -> &'static str {
 
 macro_rules! send_one_line {
     ($self:expr, $fmt:expr, $( $arg:expr ),+) => {
-        flush_lines_async_std(&mut $self.output, &[format!($fmt, $( $arg ),+).as_str()]).await
+        flush_lines_smol(&mut $self.output, &[format!($fmt, $( $arg ),+).as_str()]).await
     };
     ($self:expr, $fmt:expr) => {
-        flush_lines_async_std(&mut $self.output, &[$fmt]).await
+        flush_lines_smol(&mut $self.output, &[$fmt]).await
     }
 }
 
@@ -70,7 +70,7 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     /// Send lines of text (terminated by a single dot).
     pub async fn send_lines(&mut self, lines: &[String]) -> ClientResult<()> {
         const END_OF_DATA: [&str; 1] = ["."];
-        write_lines_async_std(
+        write_lines_smol(
             &mut self.output,
             lines
                 .iter()
@@ -79,12 +79,12 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
                 .as_slice(),
         )
         .await?;
-        flush_lines_async_std(&mut self.output, &END_OF_DATA).await?;
+        flush_lines_smol(&mut self.output, &END_OF_DATA).await?;
         Ok(())
     }
     /// Receive answer from server
     async fn receive_answer(&mut self, lines: &mut Vec<String>) -> ClientStatus {
-        crate::protocol::receive_answer_async_std(&mut self.input, Some(lines)).await
+        crate::protocol::receive_answer_smol(&mut self.input, Some(lines)).await
     }
     /// Receive one response.
     pub async fn receive(&mut self) -> ClientResult<Response> {

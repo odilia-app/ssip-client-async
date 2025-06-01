@@ -10,8 +10,8 @@
 use log::debug;
 use std::io::{self, BufRead, Write};
 
-#[cfg(any(feature = "async-io", doc))]
-use smol::io::{AsyncBufReadExt as AsyncBufReadStd, AsyncWriteExt as AsyncWriteStd};
+#[cfg(any(feature = "smol", doc))]
+use smol::io::{AsyncBufReadExt as AsyncBufReadSmol, AsyncWriteExt as AsyncWriteSmol};
 #[cfg(any(feature = "tokio", doc))]
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt};
 
@@ -93,8 +93,8 @@ pub(crate) async fn write_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
     Ok(())
 }
 /// Write lines (asyncronously) separated by CRLF.
-#[cfg(any(feature = "async-io", doc))]
-pub(crate) async fn write_lines_async_std<W: AsyncWriteStd + Unpin + ?Sized>(
+#[cfg(any(feature = "smol", doc))]
+pub(crate) async fn write_lines_smol<W: AsyncWriteSmol + Unpin + ?Sized>(
     output: &mut W,
     lines: &[&str],
 ) -> ClientResult<()> {
@@ -123,12 +123,12 @@ pub(crate) async fn flush_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
     Ok(())
 }
 /// Write lines separated by CRLF and flush the output asyncronously.
-#[cfg(any(feature = "async-io", doc))]
-pub(crate) async fn flush_lines_async_std<W: AsyncWriteStd + Unpin + ?Sized>(
+#[cfg(any(feature = "smol", doc))]
+pub(crate) async fn flush_lines_smol<W: AsyncWriteSmol + Unpin + ?Sized>(
     output: &mut W,
     lines: &[&str],
 ) -> ClientResult<()> {
-    write_lines_async_std(output, lines).await?;
+    write_lines_smol(output, lines).await?;
     output.flush().await?;
     Ok(())
 }
@@ -181,8 +181,8 @@ pub(crate) async fn receive_answer_tokio<W: AsyncBufRead + Unpin + ?Sized>(
     }
 }
 /// Read lines from server until a status line is found.
-#[cfg(any(feature = "async-io", doc))]
-pub(crate) async fn receive_answer_async_std<W: AsyncBufReadStd + Unpin + ?Sized>(
+#[cfg(any(feature = "smol", doc))]
+pub(crate) async fn receive_answer_smol<W: AsyncBufReadSmol + Unpin + ?Sized>(
     input: &mut W,
     mut lines: Option<&mut Vec<String>>,
 ) -> ClientStatus {
