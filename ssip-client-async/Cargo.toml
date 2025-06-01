@@ -5,6 +5,7 @@ rust-version = "1.81.0"
 authors = ["Laurent Pelecq <lpelecq+rust@circoise.eu>", "Tait Hoyem <tait@tait.tech>"]
 edition = "2021"
 description = "Client API for Speech Dispatcher"
+readme = "../README.md"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/odilia-app/ssip-client-async/"
 
