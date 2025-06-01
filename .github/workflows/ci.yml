@@ -120,7 +120,7 @@ jobs:
         with:
           toolchain: stable
       - name: Run Tests
-        run: cargo test --workspace --all-featues -- --nocapture
+        run: cargo test --workspace --all-features -- --nocapture
   rustfmt:
     runs-on: ubuntu-latest
     steps:
