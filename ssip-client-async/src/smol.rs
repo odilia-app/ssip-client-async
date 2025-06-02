@@ -67,6 +67,9 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     pub fn new(input: R, output: W) -> Self {
         Self { input, output }
     }
+    pub async fn send_line(&mut self, line: &str) -> ClientResult<&mut Self> {
+        self.send(Request::SendLine(line.to_string())).await
+    }
     /// Send lines of text (terminated by a single dot).
     pub async fn send_lines(&mut self, lines: &[String]) -> ClientResult<()> {
         const END_OF_DATA: [&str; 1] = ["."];

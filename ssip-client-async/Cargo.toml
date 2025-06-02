@@ -33,3 +33,5 @@ ssip-client-async = { path = ".", features = ["tokio", "smol"] }
 lazy_static = "1"
 popol = "1"
 tempfile = "3"
+smol-macros = "0.1.1"
+macro_rules_attribute = "0.2.2"
