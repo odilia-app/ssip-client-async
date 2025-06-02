@@ -25,7 +25,7 @@ dbus = ["ssip/dbus"]
 serde = ["ssip/serde"]
 async-mio = ["mio/net", "mio/os-poll"]
 tokio = ["dep:tokio"]
-async-io = ["dep:async-io", "dep:async-net", "dep:futures-lite"]
+async-io = ["dep:async-net", "dep:futures-lite"]
 
 [dev-dependencies]
 mio = { version = "1.0", features = ["os-poll", "os-ext"] }
