@@ -1,6 +1,6 @@
 [package]
 name = "ssip-client-async"
-version = "0.16.0"
+version = "0.16.1"
 rust-version = "1.81.0"
 authors = ["Laurent Pelecq <lpelecq+rust@circoise.eu>", "Tait Hoyem <tait@tait.tech>"]
 edition = "2021"
@@ -12,7 +12,7 @@ repository = "https://github.com/odilia-app/ssip-client-async/"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ssip = { version = "0.4.0", path = "../ssip" }
+ssip = { version = "0.4.1", path = "../ssip" }
 dirs = "6"
 log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
 mio = { version = "1.0", optional = true }
