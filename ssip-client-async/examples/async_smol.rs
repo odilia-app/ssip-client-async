@@ -6,7 +6,7 @@ use ssip_client_async::{
 };
 
 #[cfg(all(unix, feature = "async-io"))]
-#[apply(main)]
+main! {
 async fn main() -> ClientResult<()> {
     println!("Example:");
     let mut client = Builder::default().build().await?;
@@ -52,6 +52,7 @@ async fn main() -> ClientResult<()> {
     println!("id2: {msg_id}");
     client.quit().await?.receive().await?;
     Ok(())
+}
 }
 
 #[cfg(all(unix, not(feature = "async-io")))]
