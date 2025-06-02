@@ -7,8 +7,7 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-#[cfg(not(feature = "async-mio"))]
-mod synchronous {
+pub mod synchronous {
     use std::io::{self, BufReader, BufWriter};
     pub use std::net::TcpStream;
     use std::net::{SocketAddr, ToSocketAddrs};
@@ -63,17 +62,14 @@ mod synchronous {
     }
 }
 
-#[cfg(not(feature = "async-mio"))]
-pub use synchronous::{Builder, TcpStream};
-
 #[cfg(feature = "async-mio")]
-mod asynchronous {
+pub mod asynchronous_mio {
     pub use mio::net::TcpStream;
     use std::io::{self, BufReader, BufWriter};
     use std::net::SocketAddr;
     use std::net::TcpStream as StdTcpStream;
 
-    use crate::client::Client;
+    use crate::client::MioClient;
 
     pub struct Builder {
         addr: SocketAddr,
@@ -84,18 +80,15 @@ mod asynchronous {
             Self { addr }
         }
 
-        pub fn build(&self) -> io::Result<Client<TcpStream>> {
+        pub fn build(&self) -> io::Result<MioClient<TcpStream>> {
             let stream = StdTcpStream::connect(self.addr)?;
-            Ok(Client::new(
+            Ok(MioClient::new(
                 BufReader::new(TcpStream::from_std(stream.try_clone()?)),
                 BufWriter::new(TcpStream::from_std(stream)),
             ))
         }
     }
 }
-
-#[cfg(feature = "async-mio")]
-pub use asynchronous::{Builder, TcpStream};
 
 #[cfg(test)]
 mod tests {}

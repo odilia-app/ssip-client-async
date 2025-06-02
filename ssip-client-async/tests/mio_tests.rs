@@ -16,7 +16,7 @@ use std::{
 };
 
 #[cfg(feature = "async-mio")]
-use ssip_client_async::{client::Source, *};
+use ssip_client_async::{client::MioSource, client::Source, MioQueuedClient, *};
 
 #[cfg(feature = "async-mio")]
 mod server;
@@ -69,8 +69,8 @@ impl<'a, 'b> State<'a, 'b> {
 }
 
 #[cfg(feature = "async-mio")]
-fn basic_async_client_communication<S: Read + Write + Source>(
-    client: &mut QueuedClient<S>,
+fn basic_async_client_communication<S: Read + Write + Source + MioSource>(
+    client: &mut MioQueuedClient<S>,
 ) -> ClientResult<usize> {
     let get_requests = [Request::GetOutputModule, Request::GetRate];
     let get_answers = ["espeak", "10"];
@@ -142,7 +142,7 @@ fn basic_async_unix_communication() -> ClientResult<()> {
     let socket_path = socket_dir.path().join("basic_async_communication.socket");
     assert!(!socket_path.exists());
     let handle = server::run_unix(&socket_path, &BASIC_COMMUNICATION)?;
-    let mut client = QueuedClient::new(
+    let mut client = MioQueuedClient::new(
         fifo::asynchronous_mio::Builder::new()
             .path(&socket_path)
             .build()?,
@@ -159,7 +159,8 @@ fn basic_async_unix_communication() -> ClientResult<()> {
 fn basic_async_tcp_communication() -> ClientResult<()> {
     let addr = "127.0.0.1:9999";
     let handle = server::run_tcp(addr, &BASIC_COMMUNICATION)?;
-    let mut client = QueuedClient::new(tcp::Builder::new(addr.parse().unwrap()).build()?);
+    let mut client =
+        MioQueuedClient::new(tcp::asynchronous_mio::Builder::new(addr.parse().unwrap()).build()?);
     let countdown = basic_async_client_communication(&mut client)?;
     handle.join().unwrap().unwrap();
     assert!(countdown > 0);

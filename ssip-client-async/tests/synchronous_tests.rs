@@ -71,7 +71,7 @@ where
     let tcp_port = TCP_PORT.clone().fetch_add(1, AtomicOrdering::SeqCst);
     let addr = format!("127.0.0.1:{tcp_port}");
     let handle = server::run_tcp(&addr, communication)?;
-    let mut client = ssip_client_async::tcp::Builder::new(&addr)?.build()?;
+    let mut client = ssip_client_async::tcp::synchronous::Builder::new(&addr)?.build()?;
     client
         .set_client_name(ClientName::new("test", "test"))?
         .check_client_name_set()?;

@@ -50,7 +50,6 @@ impl FifoPath {
     }
 }
 
-#[cfg(not(feature = "async-mio"))]
 pub mod synchronous {
     use std::io::{self, BufReader, BufWriter};
     pub use std::os::unix::net::UnixStream;
@@ -167,7 +166,7 @@ pub mod asynchronous_mio {
     use std::os::unix::net::UnixStream as StdUnixStream;
     use std::path::Path;
 
-    use crate::client::Client;
+    use crate::client::MioClient as Client;
 
     use super::FifoPath;
 
