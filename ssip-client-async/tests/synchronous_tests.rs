@@ -39,7 +39,7 @@ where
     assert!(!socket_path.exists());
     let mut process_wrapper = std::panic::AssertUnwindSafe(process);
     let handle = server::run_unix(&socket_path, communication)?;
-    let mut client = ssip_client_async::fifo::Builder::new()
+    let mut client = ssip_client_async::fifo::synchronous::Builder::new()
         .path(&socket_path)
         .build()?;
     client

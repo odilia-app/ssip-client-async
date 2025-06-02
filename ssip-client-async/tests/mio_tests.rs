@@ -142,7 +142,11 @@ fn basic_async_unix_communication() -> ClientResult<()> {
     let socket_path = socket_dir.path().join("basic_async_communication.socket");
     assert!(!socket_path.exists());
     let handle = server::run_unix(&socket_path, &BASIC_COMMUNICATION)?;
-    let mut client = QueuedClient::new(fifo::Builder::new().path(&socket_path).build()?);
+    let mut client = QueuedClient::new(
+        fifo::asynchronous_mio::Builder::new()
+            .path(&socket_path)
+            .build()?,
+    );
     let countdown = basic_async_client_communication(&mut client)?;
     handle.join().unwrap().unwrap();
     socket_dir.close()?;

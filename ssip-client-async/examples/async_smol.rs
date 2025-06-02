@@ -1,4 +1,3 @@
-use macro_rules_attribute::apply;
 use smol_macros::main;
 use ssip_client_async::{
     fifo::asynchronous_async_io::Builder,
