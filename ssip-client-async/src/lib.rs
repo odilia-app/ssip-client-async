@@ -42,8 +42,8 @@ pub mod tcp;
 #[cfg(not(feature = "async-mio"))]
 pub use client::Client;
 
-#[cfg(feature = "smol")]
-pub mod smol;
+#[cfg(feature = "async-io")]
+pub mod async_io;
 #[cfg(feature = "tokio")]
 pub mod tokio;
 

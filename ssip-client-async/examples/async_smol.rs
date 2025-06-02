@@ -1,11 +1,11 @@
 use macro_rules_attribute::apply;
 use smol_macros::main;
 use ssip_client_async::{
-    fifo::asynchronous_smol::Builder,
+    fifo::asynchronous_async_io::Builder,
     types::{ClientName, ClientResult, ClientScope},
 };
 
-#[cfg(all(unix, feature = "smol"))]
+#[cfg(all(unix, feature = "async-io"))]
 #[apply(main)]
 async fn main() -> ClientResult<()> {
     println!("Example:");
@@ -54,7 +54,7 @@ async fn main() -> ClientResult<()> {
     Ok(())
 }
 
-#[cfg(all(unix, not(feature = "smol")))]
+#[cfg(all(unix, not(feature = "async-io")))]
 fn main() {
     println!("see hello.rs for an example of a synchronous client.");
 }

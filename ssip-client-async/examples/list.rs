@@ -23,7 +23,7 @@ fn main() -> ClientResult<()> {
         }
     }
 
-    let mut client = fifo::Builder::new().build()?;
+    let mut client = fifo::synchronous::Builder::new().build()?;
     client
         .set_client_name(ClientName::new("joe", "list"))?
         .check_client_name_set()?;

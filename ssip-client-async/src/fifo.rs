@@ -122,12 +122,11 @@ pub mod synchronous {
     }
 }
 
-#[cfg(feature = "smol")]
-pub mod asynchronous_smol {
-    use crate::smol::AsyncClient;
-    use smol::io;
-    use smol::io::BufReader;
-    pub use smol::net::unix::UnixStream;
+#[cfg(feature = "async-io")]
+pub mod asynchronous_async_io {
+    use crate::async_io::AsyncClient;
+    use async_net::unix::UnixStream;
+    use futures_lite::io::{self, BufReader};
     use std::path::Path;
 
     use super::FifoPath;
