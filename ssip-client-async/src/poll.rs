@@ -10,6 +10,8 @@
 use std::collections::VecDeque;
 use std::io::{Read, Write};
 
+#[cfg(feature = "async-mio")]
+use crate::client::{MioClient, MioSource};
 use crate::{
     client::{Client, Source},
     types::*,
@@ -42,9 +44,71 @@ pub struct QueuedClient<S: Read + Write + Source> {
     requests: VecDeque<Request>,
 }
 
+/// Client with a queue of requests.
+///
+/// The client can be used with crates like [popol](https://crates.io/crates/popol) or
+/// with [mio](https://crates.io/crates/mio) if feature `async-mio` is enabled.
+///
+/// When the output is ready, a next event can be sent.
+#[cfg(feature = "async-mio")]
+pub struct MioQueuedClient<S: Read + Write + MioSource + Source> {
+    client: MioClient<S>,
+    requests: VecDeque<Request>,
+}
+
 impl<S: Read + Write + Source> QueuedClient<S> {
     /// New asynchronous client build on top of a synchronous client.
     pub fn new(client: Client<S>) -> Self {
+        Self {
+            client,
+            requests: VecDeque::with_capacity(INITIAL_REQUEST_QUEUE_CAPACITY),
+        }
+    }
+
+    /// Push a new request in the queue.
+    pub fn push(&mut self, request: Request) {
+        self.requests.push_back(request);
+    }
+
+    /// Pop the last request in the queue.
+    pub fn pop(&mut self) -> Option<Request> {
+        self.requests.pop_back()
+    }
+
+    /// Last request in the queue.
+    pub fn last(&self) -> Option<&Request> {
+        self.requests.back()
+    }
+
+    /// Return true if there is a pending request.
+    pub fn has_next(&self) -> bool {
+        !self.requests.is_empty()
+    }
+
+    /// Write one pending request if any.
+    ///
+    /// Instance of `mio::Poll` generates a writable event only once until the socket returns `WouldBlock`.
+    /// This error is mapped to `ClientError::NotReady`.
+    pub fn send_next(&mut self) -> ClientResult<bool> {
+        if let Some(request) = self.requests.pop_front() {
+            self.client.send(request)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Receive one response.
+    ///
+    /// Must be called each time a readable event is returned by `mio::Poll`.
+    pub fn receive_next(&mut self) -> ClientResult<Response> {
+        self.client.receive()
+    }
+}
+#[cfg(feature = "async-mio")]
+impl<S: Read + Write + MioSource + Source> MioQueuedClient<S> {
+    /// New asynchronous client build on top of a synchronous client.
+    pub fn new(client: MioClient<S>) -> Self {
         Self {
             client,
             requests: VecDeque::with_capacity(INITIAL_REQUEST_QUEUE_CAPACITY),

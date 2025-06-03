@@ -17,7 +17,7 @@
 //! Example
 //! ```no_run
 //! use ssip_client_async::{fifo, ClientName};
-//! let mut client = fifo::Builder::new().build()?;
+//! let mut client = fifo::synchronous::Builder::new().build()?;
 //! client
 //!     .set_client_name(ClientName::new("joe", "hello"))?
 //!     .check_client_name_set()?;
@@ -39,14 +39,17 @@ pub mod fifo;
 pub mod net;
 pub mod tcp;
 
-#[cfg(not(feature = "async-mio"))]
 pub use client::Client;
+#[cfg(feature = "async-mio")]
+pub use client::MioClient;
 
-#[cfg(feature = "smol")]
-pub mod smol;
+#[cfg(feature = "async-io")]
+pub mod async_io;
 #[cfg(feature = "tokio")]
 pub mod tokio;
 
 pub use constants::*;
+#[cfg(feature = "async-mio")]
+pub use poll::MioQueuedClient;
 pub use poll::QueuedClient;
 pub use types::*;

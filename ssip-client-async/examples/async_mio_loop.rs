@@ -9,7 +9,7 @@ use std::{
 
 #[cfg(all(unix, feature = "async-mio"))]
 use ssip_client_async::{
-    fifo, ClientError, ClientName, ClientResult, QueuedClient, Request, Response,
+    fifo, ClientError, ClientName, ClientResult, MioQueuedClient, Request, Response,
 };
 
 #[cfg(all(unix, feature = "async-mio"))]
@@ -27,7 +27,7 @@ fn main() -> ClientResult<()> {
         .register(&mut source_fd, stdin_token, Interest::READABLE)?;
 
     // Register the SSIP client
-    let mut ssip_client = QueuedClient::new(fifo::Builder::new().build()?);
+    let mut ssip_client = MioQueuedClient::new(fifo::asynchronous_mio::Builder::new().build()?);
     let speech_input_token = Token(1);
     let speech_output_token = Token(2);
     ssip_client.register(&poll, speech_input_token, speech_output_token)?;

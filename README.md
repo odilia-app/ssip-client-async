@@ -14,7 +14,7 @@ Speech Dispatcher [SSIP client library](http://htmlpreview.github.io/?https://gi
 - [x] Notifications.
 - [x] Message history.
 - [x] `tokio` support.
-- [x] `smol`/`async-io` support.
+- [x] `async-io` support.
 - [x] separate protocol driving mechanism in the `ssip` crate.
 
 Feature Flags
@@ -23,7 +23,7 @@ Feature Flags
 - `default`: none.
 - `dbus`: add support to send these types over DBus via the `zbus` crate.
 - `serde`: add support to serialize/deserialize the types with `serde`.
-- `smol`: add support for the `smol`/`async-io` runtime. This _does not pull in an entire runtime, it only adds integration points_.
+- `async-io`: add support for the `smol`/`async-io` runtime. This _does not pull in an entire runtime, it only adds generic `async` integration points_.
 - `tokio`: add support for the `tokio` runtime. This will pull in the `tokio` runtime along with support for its `tokio::io::Async*` traits.
 - `async-mio`: add support for the low-level `mio` polling mechanism.
 

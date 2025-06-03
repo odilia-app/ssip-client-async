@@ -5,7 +5,7 @@ use ssip_client_async::{
 
 #[cfg(all(unix, not(feature = "async-mio")))]
 fn main() -> ClientResult<()> {
-    let mut client = fifo::Builder::new().build()?;
+    let mut client = fifo::synchronous::Builder::new().build()?;
     client
         .set_client_name(ClientName::new("joe", "notifications"))?
         .check_client_name_set()?;

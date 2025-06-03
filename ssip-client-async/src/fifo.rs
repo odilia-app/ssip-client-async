@@ -50,8 +50,7 @@ impl FifoPath {
     }
 }
 
-#[cfg(not(feature = "async-mio"))]
-mod synchronous {
+pub mod synchronous {
     use std::io::{self, BufReader, BufWriter};
     pub use std::os::unix::net::UnixStream;
     use std::path::Path;
@@ -66,6 +65,11 @@ mod synchronous {
     pub struct Builder {
         path: FifoPath,
         mode: StreamMode,
+    }
+    impl Default for Builder {
+        fn default() -> Self {
+            Self::new()
+        }
     }
 
     impl Builder {
@@ -117,22 +121,62 @@ mod synchronous {
     }
 }
 
-#[cfg(not(feature = "async-mio"))]
-pub use synchronous::{Builder, UnixStream};
-
-#[cfg(feature = "async-mio")]
-mod asynchronous {
-    pub use mio::net::UnixStream;
-    use std::io::{self, BufReader, BufWriter};
-    use std::os::unix::net::UnixStream as StdUnixStream;
+#[cfg(feature = "async-io")]
+pub mod asynchronous_async_io {
+    use crate::async_io::AsyncClient;
+    use async_net::unix::UnixStream;
+    use futures_lite::io::{self, BufReader};
     use std::path::Path;
-
-    use crate::client::Client;
 
     use super::FifoPath;
 
     pub struct Builder {
         path: FifoPath,
+    }
+    impl Default for Builder {
+        fn default() -> Self {
+            Self {
+                path: FifoPath::new(),
+            }
+        }
+    }
+
+    impl Builder {
+        pub fn path<P>(&mut self, socket_path: P) -> &mut Self
+        where
+            P: AsRef<Path>,
+        {
+            self.path.set(socket_path);
+            self
+        }
+
+        pub async fn build(&self) -> io::Result<AsyncClient<BufReader<UnixStream>, UnixStream>> {
+            let stream = UnixStream::connect(self.path.get()?).await?;
+            let (unbuf_read_stream, write_stream) = (stream.clone(), stream);
+            let read_stream = BufReader::new(unbuf_read_stream);
+            Ok(AsyncClient::new(read_stream, write_stream))
+        }
+    }
+}
+
+#[cfg(feature = "async-mio")]
+pub mod asynchronous_mio {
+    pub use mio::net::UnixStream;
+    use std::io::{self, BufReader, BufWriter};
+    use std::os::unix::net::UnixStream as StdUnixStream;
+    use std::path::Path;
+
+    use crate::client::MioClient as Client;
+
+    use super::FifoPath;
+
+    pub struct Builder {
+        path: FifoPath,
+    }
+    impl Default for Builder {
+        fn default() -> Self {
+            Self::new()
+        }
     }
 
     impl Builder {
@@ -166,6 +210,7 @@ mod asynchronous {
         }
     }
 }
+
 #[cfg(feature = "tokio")]
 pub mod asynchronous_tokio {
     use std::path::Path;
@@ -207,15 +252,6 @@ pub mod asynchronous_tokio {
                 AsyncBufWriter::new(write_stream),
             ))
         }
-    }
-}
-
-#[cfg(feature = "async-mio")]
-pub use asynchronous::{Builder, UnixStream};
-
-impl Default for Builder {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

@@ -10,8 +10,8 @@
 use log::debug;
 use std::io::{self, BufRead, Write};
 
-#[cfg(feature = "smol")]
-use smol::io::{AsyncBufReadExt as AsyncBufReadSmol, AsyncWriteExt as AsyncWriteSmol};
+#[cfg(feature = "async-io")]
+use futures_lite::io::{AsyncBufReadExt as AsyncBufReadSmol, AsyncWriteExt as AsyncWriteSmol};
 #[cfg(feature = "tokio")]
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt};
 
@@ -93,7 +93,7 @@ pub(crate) async fn write_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
     Ok(())
 }
 /// Write lines (asyncronously) separated by CRLF.
-#[cfg(feature = "smol")]
+#[cfg(feature = "async-io")]
 pub(crate) async fn write_lines_smol<W: AsyncWriteSmol + Unpin + ?Sized>(
     output: &mut W,
     lines: &[&str],
@@ -123,7 +123,7 @@ pub(crate) async fn flush_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
     Ok(())
 }
 /// Write lines separated by CRLF and flush the output asyncronously.
-#[cfg(feature = "smol")]
+#[cfg(feature = "async-io")]
 pub(crate) async fn flush_lines_smol<W: AsyncWriteSmol + Unpin + ?Sized>(
     output: &mut W,
     lines: &[&str],
@@ -181,7 +181,7 @@ pub(crate) async fn receive_answer_tokio<W: AsyncBufRead + Unpin + ?Sized>(
     }
 }
 /// Read lines from server until a status line is found.
-#[cfg(feature = "smol")]
+#[cfg(feature = "async-io")]
 pub(crate) async fn receive_answer_smol<W: AsyncBufReadSmol + Unpin + ?Sized>(
     input: &mut W,
     mut lines: Option<&mut Vec<String>>,

@@ -14,7 +14,7 @@ use crate::protocol::{
 };
 use crate::types::*;
 
-use smol::io::{AsyncBufReadExt as AsyncBufRead, AsyncWriteExt as AsyncWrite};
+use futures_lite::io::{AsyncBufReadExt as AsyncBufRead, AsyncWriteExt as AsyncWrite};
 
 /// Convert boolean to ON or OFF
 fn on_off(value: bool) -> &'static str {
@@ -66,6 +66,9 @@ pub struct AsyncClient<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> {
 impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     pub fn new(input: R, output: W) -> Self {
         Self { input, output }
+    }
+    pub async fn send_line(&mut self, line: &str) -> ClientResult<&mut Self> {
+        self.send(Request::SendLine(line.to_string())).await
     }
     /// Send lines of text (terminated by a single dot).
     pub async fn send_lines(&mut self, lines: &[String]) -> ClientResult<()> {
