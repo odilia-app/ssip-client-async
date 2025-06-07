@@ -7,6 +7,7 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
+use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -31,8 +32,8 @@ impl FifoPath {
 
     /// Return the standard socket according to the [freedesktop.org](https://www.freedesktop.org/) specification.
     fn default_path() -> io::Result<PathBuf> {
-        match dirs::runtime_dir() {
-            Some(runtime_dir) => Ok(runtime_dir
+        match env::var_os("XDG_RUNTIME_DIR") {
+            Some(runtime_dir) => Ok(PathBuf::from(runtime_dir)
                 .join(SPEECHD_APPLICATION_NAME)
                 .join(SPEECHD_SOCKET_NAME)),
             None => Err(io::Error::new(
