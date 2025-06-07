@@ -7,8 +7,8 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-use std::io;
 use std::env;
+use std::io;
 use std::path::{Path, PathBuf};
 
 const SPEECHD_APPLICATION_NAME: &str = "speech-dispatcher";
