@@ -7,12 +7,10 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-use std::fmt;
+use core::error::Error;
+use core::fmt;
 use std::io;
 use std::str::FromStr;
-use thiserror::Error as ThisError;
-
-use strum_macros::Display as StrumDisplay;
 
 /// Return code of SSIP commands
 pub type ReturnCode = u16;
@@ -66,222 +64,273 @@ impl fmt::Display for ClientScope {
 }
 
 /// Priority
-#[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum Priority {
-    #[strum(serialize = "progress")]
     Progress,
-    #[strum(serialize = "notification")]
     Notification,
-    #[strum(serialize = "message")]
     Message,
-    #[strum(serialize = "text")]
     Text,
-    #[strum(serialize = "important")]
     Important,
 }
 
+/// NOTE: The [`fmt::Display`] implementation is how we format the enum for implementing the SSIP
+/// protocol.
+///
+/// The [`fmt::Display`] impl either:
+///
+/// 1. Can not be changed,
+/// 2. Must implement a different trait.
+impl fmt::Display for Priority {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Priority::Progress => fmt.write_str("important"),
+            Priority::Notification => fmt.write_str("notification"),
+            Priority::Message => fmt.write_str("message"),
+            Priority::Text => fmt.write_str("text"),
+            Priority::Important => fmt.write_str("message"),
+        }
+    }
+}
+
 /// Punctuation mode.
-#[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum PunctuationMode {
-    #[strum(serialize = "none")]
     None,
-    #[strum(serialize = "some")]
     Some,
-    #[strum(serialize = "most")]
     Most,
-    #[strum(serialize = "all")]
     All,
+}
+
+/// NOTE: the display impl is used to write to SSIP command buffers.
+impl fmt::Display for PunctuationMode {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let s = match self {
+            PunctuationMode::None => "none",
+            PunctuationMode::Some => "some",
+            PunctuationMode::Most => "most",
+            PunctuationMode::All => "all",
+        };
+        fmt.write_str(s)
+    }
 }
 
 /// Capital letters recognition mode.
-#[derive(StrumDisplay, Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum CapitalLettersRecognitionMode {
-    #[strum(serialize = "none")]
     None,
-    #[strum(serialize = "spell")]
     Spell,
-    #[strum(serialize = "icon")]
     Icon,
 }
 
+/// NOTE: The Display implementation is used when constructing SSIP commands.
+impl fmt::Display for CapitalLettersRecognitionMode {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let s = match self {
+            CapitalLettersRecognitionMode::None => "none",
+            CapitalLettersRecognitionMode::Spell => "spell",
+            CapitalLettersRecognitionMode::Icon => "icon",
+        };
+        fmt.write_str(s)
+    }
+}
+
 /// Symbolic key names
-#[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
 #[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum KeyName {
-    #[strum(serialize = "space")]
     Space,
-    #[strum(serialize = "underscore")]
     Underscore,
-    #[strum(serialize = "double-quote")]
     DoubleQuote,
-    #[strum(serialize = "alt")]
     Alt,
-    #[strum(serialize = "control")]
     Control,
-    #[strum(serialize = "hyper")]
     Hyper,
-    #[strum(serialize = "meta")]
     Meta,
-    #[strum(serialize = "shift")]
     Shift,
-    #[strum(serialize = "super")]
     Super,
-    #[strum(serialize = "backspace")]
     Backspace,
-    #[strum(serialize = "break")]
     Break,
-    #[strum(serialize = "delete")]
     Delete,
-    #[strum(serialize = "down")]
     Down,
-    #[strum(serialize = "end")]
     End,
-    #[strum(serialize = "enter")]
     Enter,
-    #[strum(serialize = "escape")]
     Escape,
-    #[strum(serialize = "f1")]
     F1,
-    #[strum(serialize = "f2")]
     F2,
-    #[strum(serialize = "f3")]
     F3,
-    #[strum(serialize = "f4")]
     F4,
-    #[strum(serialize = "f5")]
     F5,
-    #[strum(serialize = "f6")]
     F6,
-    #[strum(serialize = "f7")]
     F7,
-    #[strum(serialize = "f8")]
     F8,
-    #[strum(serialize = "f9")]
     F9,
-    #[strum(serialize = "f10")]
     F10,
-    #[strum(serialize = "f11")]
     F11,
-    #[strum(serialize = "f12")]
     F12,
-    #[strum(serialize = "f13")]
     F13,
-    #[strum(serialize = "f14")]
     F14,
-    #[strum(serialize = "f15")]
     F15,
-    #[strum(serialize = "f16")]
     F16,
-    #[strum(serialize = "f17")]
     F17,
-    #[strum(serialize = "f18")]
     F18,
-    #[strum(serialize = "f19")]
     F19,
-    #[strum(serialize = "f20")]
     F20,
-    #[strum(serialize = "f21")]
     F21,
-    #[strum(serialize = "f22")]
     F22,
-    #[strum(serialize = "f23")]
     F23,
-    #[strum(serialize = "f24")]
     F24,
-    #[strum(serialize = "home")]
     Home,
-    #[strum(serialize = "insert")]
     Insert,
-    #[strum(serialize = "kp-*")]
     KpMultiply,
-    #[strum(serialize = "kp-+")]
     KpPlus,
-    #[strum(serialize = "kp--")]
     KpMinus,
-    #[strum(serialize = "kp-.")]
     KpDot,
-    #[strum(serialize = "kp-/")]
     KpDivide,
-    #[strum(serialize = "kp-0")]
     Kp0,
-    #[strum(serialize = "kp-1")]
     Kp1,
-    #[strum(serialize = "kp-2")]
     Kp2,
-    #[strum(serialize = "kp-3")]
     Kp3,
-    #[strum(serialize = "kp-4")]
     Kp4,
-    #[strum(serialize = "kp-5")]
     Kp5,
-    #[strum(serialize = "kp-6")]
     Kp6,
-    #[strum(serialize = "kp-7")]
     Kp7,
-    #[strum(serialize = "kp-8")]
     Kp8,
-    #[strum(serialize = "kp-9")]
     Kp9,
-    #[strum(serialize = "kp-enter")]
     KpEnter,
-    #[strum(serialize = "left")]
     Left,
-    #[strum(serialize = "menu")]
     Menu,
-    #[strum(serialize = "next")]
     Next,
-    #[strum(serialize = "num-lock")]
     NumLock,
-    #[strum(serialize = "pause")]
     Pause,
-    #[strum(serialize = "print")]
     Print,
-    #[strum(serialize = "prior")]
     Prior,
-    #[strum(serialize = "return")]
     Return,
-    #[strum(serialize = "right")]
     Right,
-    #[strum(serialize = "scroll-lock")]
     ScrollLock,
-    #[strum(serialize = "tab")]
     Tab,
-    #[strum(serialize = "up")]
     Up,
-    #[strum(serialize = "window")]
     Window,
 }
 
+/// NOTE: Display impl is used for SSIP command creation.
+impl fmt::Display for KeyName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            KeyName::Space => "space",
+            KeyName::Underscore => "underscore",
+            KeyName::DoubleQuote => "double-quote",
+            KeyName::Alt => "alt",
+            KeyName::Control => "control",
+            KeyName::Hyper => "hyper",
+            KeyName::Meta => "meta",
+            KeyName::Shift => "shift",
+            KeyName::Super => "super",
+            KeyName::Backspace => "backspace",
+            KeyName::Break => "break",
+            KeyName::Delete => "delete",
+            KeyName::Down => "down",
+            KeyName::End => "end",
+            KeyName::Enter => "enter",
+            KeyName::Escape => "escape",
+            KeyName::F1 => "f1",
+            KeyName::F2 => "f2",
+            KeyName::F3 => "f3",
+            KeyName::F4 => "f4",
+            KeyName::F5 => "f5",
+            KeyName::F6 => "f6",
+            KeyName::F7 => "f7",
+            KeyName::F8 => "f8",
+            KeyName::F9 => "f9",
+            KeyName::F10 => "f10",
+            KeyName::F11 => "f11",
+            KeyName::F12 => "f12",
+            KeyName::F13 => "f13",
+            KeyName::F14 => "f14",
+            KeyName::F15 => "f15",
+            KeyName::F16 => "f16",
+            KeyName::F17 => "f17",
+            KeyName::F18 => "f18",
+            KeyName::F19 => "f19",
+            KeyName::F20 => "f20",
+            KeyName::F21 => "f21",
+            KeyName::F22 => "f22",
+            KeyName::F23 => "f23",
+            KeyName::F24 => "f24",
+            KeyName::Home => "home",
+            KeyName::Insert => "insert",
+            KeyName::KpMultiply => "kp-*",
+            KeyName::KpPlus => "kp-+",
+            KeyName::KpMinus => "kp--",
+            KeyName::KpDot => "kp-.",
+            KeyName::KpDivide => "kp-/",
+            KeyName::Kp0 => "kp-0",
+            KeyName::Kp1 => "kp-1",
+            KeyName::Kp2 => "kp-2",
+            KeyName::Kp3 => "kp-3",
+            KeyName::Kp4 => "kp-4",
+            KeyName::Kp5 => "kp-5",
+            KeyName::Kp6 => "kp-6",
+            KeyName::Kp7 => "kp-7",
+            KeyName::Kp8 => "kp-8",
+            KeyName::Kp9 => "kp-9",
+            KeyName::KpEnter => "kp-enter",
+            KeyName::Left => "left",
+            KeyName::Menu => "menu",
+            KeyName::Next => "next",
+            KeyName::NumLock => "num-lock",
+            KeyName::Pause => "pause",
+            KeyName::Print => "print",
+            KeyName::Prior => "prior",
+            KeyName::Return => "return",
+            KeyName::Right => "right",
+            KeyName::ScrollLock => "scroll-lock",
+            KeyName::Tab => "tab",
+            KeyName::Up => "up",
+            KeyName::Window => "window",
+        };
+        f.write_str(s)
+    }
+}
+
 /// Notification type
-#[derive(StrumDisplay, Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum NotificationType {
-    #[strum(serialize = "begin")]
     Begin,
-    #[strum(serialize = "end")]
     End,
-    #[strum(serialize = "cancel")]
     Cancel,
-    #[strum(serialize = "pause")]
     Pause,
-    #[strum(serialize = "resume")]
     Resume,
-    #[strum(serialize = "index_mark")]
     IndexMark,
-    #[strum(serialize = "all")]
     All,
 }
 
+impl fmt::Display for NotificationType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            NotificationType::Begin => "begin",
+            NotificationType::End => "end",
+            NotificationType::Cancel => "cancel",
+            NotificationType::Pause => "pause",
+            NotificationType::Resume => "resume",
+            NotificationType::IndexMark => "index_mark",
+            NotificationType::All => "all",
+        };
+        f.write_str(s)
+    }
+}
+
 /// Notification event type (returned by server)
-#[derive(StrumDisplay, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub enum EventType {
     Begin,
     End,
@@ -289,6 +338,20 @@ pub enum EventType {
     Pause,
     Resume,
     IndexMark(String),
+}
+
+// TODO: very suspicious that this is not correct, even though it _is_ the behaviour of `strum`
+impl fmt::Display for EventType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EventType::Begin => f.write_str("begin"),
+            EventType::End => f.write_str("end"),
+            EventType::Cancel => f.write_str("cancel"),
+            EventType::Pause => f.write_str("pause"),
+            EventType::Resume => f.write_str("resume"),
+            EventType::IndexMark(value) => write!(f, "index_mark({value})"),
+        }
+    }
 }
 
 /// Event identifier
@@ -417,21 +480,38 @@ impl fmt::Display for StatusLine {
     }
 }
 /// Client error, either I/O error or SSIP error.
-#[derive(ThisError, Debug)]
+#[derive(Debug)]
 pub enum ClientError {
-    #[error("I/O: {0}")]
     Io(io::Error),
-    #[error("Not ready")]
     NotReady,
-    #[error("SSIP: {0}")]
     Ssip(StatusLine),
-    #[error("Too few lines")]
     TooFewLines,
-    #[error("Too many lines")]
     TooManyLines,
-    #[error("Unexpected status: {0}")]
     UnexpectedStatus(ReturnCode),
 }
+
+impl fmt::Display for ClientError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ClientError::Io(ioe) => {
+                fmt.write_str("I/O: ")?;
+                ioe.fmt(fmt)
+            }
+            ClientError::NotReady => fmt.write_str("Not ready"),
+            ClientError::Ssip(status_line) => {
+                fmt.write_str("SSIP: ")?;
+                status_line.fmt(fmt)
+            }
+            ClientError::TooFewLines => fmt.write_str("Too few lines"),
+            ClientError::TooManyLines => fmt.write_str("Too many lines"),
+            ClientError::UnexpectedStatus(return_code) => {
+                fmt.write_str("Unexpected status: ")?;
+                return_code.fmt(fmt)
+            }
+        }
+    }
+}
+impl Error for ClientError {}
 
 impl ClientError {
     /// Create I/O error
@@ -491,57 +571,92 @@ impl ClientName {
 }
 
 /// Cursor motion in history
-#[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 #[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum CursorDirection {
-    #[strum(serialize = "backward")]
     Backward,
-    #[strum(serialize = "forward")]
     Forward,
 }
 
+impl fmt::Display for CursorDirection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            CursorDirection::Backward => "backward",
+            CursorDirection::Forward => "forward",
+        };
+        f.write_str(s)
+    }
+}
+
 /// Sort direction in history
-#[derive(StrumDisplay, Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 #[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum SortDirection {
-    #[strum(serialize = "asc")]
     Ascending,
-    #[strum(serialize = "desc")]
     Descending,
 }
 
+impl fmt::Display for SortDirection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            SortDirection::Ascending => "asc",
+            SortDirection::Descending => "desc",
+        };
+        f.write_str(s)
+    }
+}
+
 /// Property messages are ordered by in history
-#[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum SortKey {
-    #[strum(serialize = "client_name")]
     ClientName,
-    #[strum(serialize = "priority")]
     Priority,
-    #[strum(serialize = "message_type")]
     MessageType,
-    #[strum(serialize = "time")]
     Time,
-    #[strum(serialize = "user")]
     User,
 }
 
+impl fmt::Display for SortKey {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let s = match self {
+            SortKey::ClientName => "client_name",
+            SortKey::Priority => "priority",
+            SortKey::MessageType => "message_type",
+            SortKey::Time => "time",
+            SortKey::User => "user",
+        };
+        fmt.write_str(s)
+    }
+}
+
 /// Sort ordering
-#[derive(StrumDisplay, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "dbus", derive(zvariant::Type))]
 pub enum Ordering {
-    #[strum(serialize = "text")]
     Text,
-    #[strum(serialize = "sound_icon")]
     SoundIcon,
-    #[strum(serialize = "char")]
     Char,
-    #[strum(serialize = "key")]
     Key,
+}
+impl fmt::Display for Ordering {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Ordering::Text => "text",
+            Ordering::SoundIcon => "sound_icon",
+            Ordering::Char => "char",
+            Ordering::Key => "key",
+        };
+        f.write_str(s)
+    }
 }
 
 /// Position in history
