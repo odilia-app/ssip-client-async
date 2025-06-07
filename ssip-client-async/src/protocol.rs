@@ -7,6 +7,7 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
+#[cfg(feature = "log")]
 use log::debug;
 use std::io::{self, BufRead, Write};
 
@@ -72,6 +73,7 @@ where
 /// Write lines separated by CRLF.
 pub(crate) fn write_lines<W: Write + ?Sized>(output: &mut W, lines: &[&str]) -> ClientResult<()> {
     for line in lines.iter() {
+        #[cfg(feature = "log")]
         debug!("SSIP(out): {line}");
         output.write_all(line.as_bytes())?;
         output.write_all(b"\r\n")?;
@@ -86,6 +88,7 @@ pub(crate) async fn write_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
     lines: &[&str],
 ) -> ClientResult<()> {
     for line in lines.iter() {
+        #[cfg(feature = "log")]
         debug!("SSIP(out): {line}");
         output.write_all(line.as_bytes()).await?;
         output.write_all(b"\r\n").await?;
@@ -99,6 +102,7 @@ pub(crate) async fn write_lines_smol<W: AsyncWriteSmol + Unpin + ?Sized>(
     lines: &[&str],
 ) -> ClientResult<()> {
     for line in lines.iter() {
+        #[cfg(feature = "log")]
         debug!("SSIP(out): {line}");
         output.write_all(line.as_bytes()).await?;
         output.write_all(b"\r\n").await?;
@@ -160,6 +164,7 @@ pub(crate) async fn receive_answer_tokio<W: AsyncBufRead + Unpin + ?Sized>(
     loop {
         let mut line = String::new();
         input.read_line(&mut line).await.map_err(ClientError::Io)?;
+        #[cfg(feature = "log")]
         debug!("SSIP(in): {}", line.trim_end());
         match line.chars().nth(3) {
             Some(ch) => match ch {
@@ -189,6 +194,7 @@ pub(crate) async fn receive_answer_smol<W: AsyncBufReadSmol + Unpin + ?Sized>(
     loop {
         let mut line = String::new();
         input.read_line(&mut line).await.map_err(ClientError::Io)?;
+        #[cfg(feature = "log")]
         debug!("SSIP(in): {}", line.trim_end());
         match line.chars().nth(3) {
             Some(ch) => match ch {
@@ -218,6 +224,7 @@ pub(crate) fn receive_answer<W: BufRead + ?Sized>(
     loop {
         let mut line = String::new();
         input.read_line(&mut line).map_err(ClientError::Io)?;
+        #[cfg(feature = "log")]
         debug!("SSIP(in): {}", line.trim_end());
         match line.chars().nth(3) {
             Some(ch) => match ch {
