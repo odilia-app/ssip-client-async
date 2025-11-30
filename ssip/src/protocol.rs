@@ -1,25 +1,14 @@
-use crate::{Error, EventId, SsipStatus, StatusLine};
-use alloc::string::{String, ToString};
+use crate::{
+	Error,
+	EventId,
+	StatusLine,
+	SsipStatus,
+};
 use alloc::vec::Vec;
-use core::str::FromStr;
-
-/// Strip prefix if found
-fn strip_prefix(line: &str, prefix: &str) -> String {
-    line.strip_prefix(prefix).unwrap_or(line).to_string()
-}
-
-/// Parse the status line "OK msg" or "ERR msg"
-pub fn parse_status_line(code: u16, line: &str) -> SsipStatus {
-    if (300..700).contains(&code) {
-        const TOKEN_ERR: &str = "ERR ";
-        let message = strip_prefix(line, TOKEN_ERR);
-        Err(Error::Ssip(StatusLine { code, message }))
-    } else {
-        const TOKEN_OK: &str = "OK ";
-        let message = strip_prefix(line, TOKEN_OK);
-        Ok(StatusLine { code, message })
-    }
-}
+use alloc::string::{String, ToString};
+use core::{
+	str::FromStr,
+};
 
 /// Return the only string in the list or an error if there is no line or too many.
 pub fn parse_single_value(lines: &[String]) -> Result<String, Error> {
@@ -39,16 +28,6 @@ pub fn parse_event_id(lines: &[String]) -> Result<EventId, Error> {
     }
 }
 
-/// Parse single integer value
-pub fn parse_single_integer<T>(lines: &[String]) -> Result<T, Error>
-where
-    T: FromStr,
-{
-    parse_single_value(lines)?
-        .parse::<T>()
-        .map_err(|_| Error::InvalidData("invalid integer value"))
-}
-
 pub fn parse_typed_lines<T>(lines: &[String]) -> Result<Vec<T>, Error>
 where
     T: FromStr<Err = Error>,
@@ -57,6 +36,34 @@ where
         .iter()
         .map(|line| T::from_str(line.as_str()))
         .collect()
+}
+
+/// Strip prefix if found
+fn strip_prefix(line: &str, prefix: &str) -> String {
+    line.strip_prefix(prefix).unwrap_or(line).to_string()
+}
+
+/// Parse the status line "OK msg" or "ERR msg"
+pub fn parse_status_line(code: u16, line: &str) -> SsipStatus {
+    if (300..700).contains(&code) {
+        const TOKEN_ERR: &str = "ERR ";
+        let message = strip_prefix(line, TOKEN_ERR);
+        Err(Error::Ssip(StatusLine { code, message }))
+    } else {
+        const TOKEN_OK: &str = "OK ";
+        let message = strip_prefix(line, TOKEN_OK);
+        Ok(StatusLine { code, message })
+    }
+}
+
+/// Parse single integer value
+pub fn parse_single_integer<T>(lines: &[String]) -> Result<T, Error>
+where
+    T: FromStr,
+{
+    parse_single_value(lines)?
+        .parse::<T>()
+        .map_err(|_| Error::InvalidData("invalid integer value"))
 }
 
 /*
@@ -82,6 +89,33 @@ pub(crate) fn receive_bytes(
         },
         None if line.is_empty() => return Err(Error::invalid_data("empty line")),
         None => return Err(Error::invalid_data(&format!("line too short: {}", line))),
+=======
+/// Read lines from server until a status line is found asyncronously.
+pub(crate) fn receive_bytes(
+    input: &mut W,
+    mut lines: Option<&mut Vec<String>>,
+) -> ClientStatus {
+    loop {
+        let mut line = String::new();
+        input.read_line(&mut line).map_err(ClientError::Io)?;
+        debug!("SSIP(in): {}", line.trim_end());
+        match line.chars().nth(3) {
+            Some(ch) => match ch {
+                ' ' => match line[0..3].parse::<u16>() {
+                    Ok(code) => return parse_status_line(code, line[4..].trim_end()),
+                    Err(err) => return Err(invalid_input!(err.to_string())),
+                },
+                '-' => match lines {
+                    Some(ref mut lines) => lines.push(line[4..].trim_end().to_string()),
+                    None => return Err(invalid_input!("unexpected line: {}", line)),
+                },
+                ch => {
+                    return Err(invalid_input!("expecting space or dash, got {}.", ch));
+                }
+            },
+            None if line.is_empty() => return Err(invalid_input!("empty line")),
+            None => return Err(invalid_input!("line too short: {}", line)),
+        }
     }
 }
 */

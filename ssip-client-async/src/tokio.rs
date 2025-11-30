@@ -9,9 +9,12 @@
 
 use crate::{ClientResult, ClientStatus};
 use crate::constants::*;
+use crate::client::{
+ flush_lines_tokio,
+ write_lines_tokio
+};
 use ssip::protocol::{
-    flush_lines_tokio, parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines,
-    write_lines_tokio,
+    parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines,
 };
 use crate::types::*;
 
@@ -63,6 +66,7 @@ pub struct AsyncClient<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> {
     input: R,
     output: W,
 }
+/*
 #[cfg(feature = "tokio")]
 impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     pub(crate) fn new(input: R, output: W) -> Self {
@@ -88,7 +92,7 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     }
     /// Receive answer from server
     async fn receive_answer(&mut self, lines: Option<&mut Vec<String>>) -> ClientStatus {
-        crate::protocol::receive_answer_tokio(&mut self.input, lines).await
+        crate::clientl::receive_answer_tokio(&mut self.input, lines).await
     }
     /// Receive one response.
     pub async fn receive(&mut self) -> ClientResult<Response> {
@@ -729,3 +733,4 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
         self.check_status(OK_RECEIVING_DATA).await
     }
 }
+*/

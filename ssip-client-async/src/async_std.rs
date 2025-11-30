@@ -9,9 +9,13 @@
 
 use crate::{ClientResult, ClientStatus};
 use crate::constants::*;
+use crate::client::{
+    flush_lines_async_std, 
+     write_lines_async_std,
+};
 use ssip::protocol::{
-    flush_lines_async_std, parse_event_id, parse_single_integer, parse_single_value,
-    parse_typed_lines, write_lines_async_std,
+    parse_event_id, parse_single_integer, parse_single_value,
+    parse_typed_lines,
 };
 use crate::types::*;
 
@@ -64,6 +68,7 @@ pub struct AsyncClient<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> {
     input: R,
     output: W,
 }
+/*
 impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     pub fn new(input: R, output: W) -> Self {
         Self { input, output }
@@ -725,3 +730,4 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
         self.check_status(OK_RECEIVING_DATA).await
     }
 }
+*/

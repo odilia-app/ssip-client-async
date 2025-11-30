@@ -10,7 +10,8 @@
 use std::io::{self, BufRead, Read, Write};
 
 #[cfg(feature = "tokio")]
-use tokio::io::{AsyncBufRead, AsyncWrite};
+use tokio::io::{AsyncBufRead, AsyncWrite, AsyncWriteExt, AsyncBufReadExt};
+use crate::Error;
 use crate::constants::*;
 use crate::types::*;
 use crate::{ClientResult, ClientStatus};
@@ -26,12 +27,15 @@ pub use std::os::unix::io::AsRawFd as Source;
 #[cfg(feature = "async-mio")]
 pub use mio::event::Source;
 
+#[cfg(feature = "async-std")]
+use async_std::io::{BufRead as AsyncBufReadStd, Write as AsyncWriteStd, WriteExt, BufReadExt};
+
 macro_rules! invalid_input {
     ($msg:expr) => {
-        Error::InvalidInput($msg)
+        Error::Ssip(ssip::Error::InvalidData($msg))
     };
     ($fmt:expr, $($arg:tt)*) => {
-        invalid_input!(format!($fmt, $($arg)*).as_str())
+        invalid_input!(format!($fmt, $($arg)*).leak())
     };
 }
 
@@ -48,7 +52,8 @@ pub(crate) async fn receive_answer_async_std<W: AsyncBufReadStd + Unpin + ?Sized
         match line.chars().nth(3) {
             Some(ch) => match ch {
                 ' ' => match line[0..3].parse::<u16>() {
-                    Ok(code) => return parse_status_line(code, line[4..].trim_end()),
+                    Ok(code) => return parse_status_line(code, line[4..].trim_end())
+                        .map_err(Into::into),
                     Err(err) => return Err(invalid_input!(err.to_string())),
                 },
                 '-' => match lines {
@@ -721,12 +726,12 @@ impl<S: Read + Write + Source> Client<S> {
             OK_OUTSIDE_BLOCK => Ok(Response::OutsideBlock),
             OK_NOT_IMPLEMENTED => Ok(Response::NotImplemented),
             EVENT_INDEX_MARK => match lines.len() {
-                0..=2 => Err(Error::TooFewLines),
+                0..=2 => Err(Error::Ssip(ssip::Error::TooFewLines)),
                 3 => Ok(Response::EventIndexMark(
                     parse_event_id(&lines)?,
                     lines[2].to_owned(),
                 )),
-                _ => Err(Error::TooManyLines),
+                _ => Err(Error::Ssip(ssip::Error::TooManyLines)),
             },
             EVENT_BEGIN => Ok(Response::EventBegin(parse_event_id(&lines)?)),
             EVENT_END => Ok(Response::EventEnd(parse_event_id(&lines)?)),
@@ -743,7 +748,7 @@ impl<S: Read + Write + Source> Client<S> {
             if status.code == expected_code {
                 Ok(self)
             } else {
-                Err(Error::UnexpectedStatus(status.code))
+                Err(Error::Ssip(ssip::Error::UnexpectedStatus(status.code)))
             }
         })
     }
@@ -755,21 +760,21 @@ impl<S: Read + Write + Source> Client<S> {
         if status.code == expected_code {
             Ok(lines)
         } else {
-            Err(Error::UnexpectedStatus(status.code))
+            Err(Error::Ssip(ssip::Error::UnexpectedStatus(status.code)))
         }
     }
 
     /// Receive a single string
     pub fn receive_string(&mut self, expected_code: ReturnCode) -> ClientResult<String> {
         self.receive_lines(expected_code)
-            .and_then(|lines| parse_single_value(&lines))
+            .and_then(|lines| parse_single_value(&lines).map_err(Into::into))
     }
 
     /// Receive signed 8-bit integer
     pub fn receive_i8(&mut self) -> ClientResult<u8> {
         self.receive_string(OK_GET).and_then(|s| {
             s.parse()
-                .map_err(|_| Error::invalid_data("invalid signed integer"))
+                .map_err(|_| invalid_input!("invalid signed integer"))
         })
     }
 
@@ -777,7 +782,7 @@ impl<S: Read + Write + Source> Client<S> {
     pub fn receive_u8(&mut self) -> ClientResult<u8> {
         self.receive_string(OK_GET).and_then(|s| {
             s.parse()
-                .map_err(|_| Error::invalid_data("invalid unsigned 8-bit integer"))
+                .map_err(|_| invalid_input!("invalid unsigned 8-bit integer"))
         })
     }
 
@@ -785,7 +790,7 @@ impl<S: Read + Write + Source> Client<S> {
     pub fn receive_cursor_pos(&mut self) -> ClientResult<u16> {
         self.receive_string(OK_CUR_POS_RET).and_then(|s| {
             s.parse()
-                .map_err(|_| Error::invalid_data("invalid unsigned 16-bit integer"))
+                .map_err(|_| invalid_input!("invalid unsigned 16-bit integer"))
         })
     }
 
@@ -794,7 +799,7 @@ impl<S: Read + Write + Source> Client<S> {
         let mut lines = Vec::new();
         match self.receive_answer(&mut lines)?.code {
             OK_MESSAGE_QUEUED | OK_LAST_MSG => Ok(parse_single_integer(&lines)?),
-            _ => Err(Error::invalid_data("not a message id")),
+            _ => Err(invalid_input!("not a message id")),
         }
     }
 
@@ -802,14 +807,14 @@ impl<S: Read + Write + Source> Client<S> {
     pub fn receive_client_id(&mut self) -> ClientResult<ClientId> {
         self.receive_string(OK_CLIENT_ID_SENT).and_then(|s| {
             s.parse()
-                .map_err(|_| Error::invalid_data("invalid client id"))
+                .map_err(|_| invalid_input!("invalid client id"))
         })
     }
 
     /// Receive a list of synthesis voices
     pub fn receive_synthesis_voices(&mut self) -> ClientResult<Vec<SynthesisVoice>> {
         self.receive_lines(OK_VOICES_LIST_SENT)
-            .and_then(|lines| parse_typed_lines::<SynthesisVoice>(&lines))
+            .and_then(|lines| parse_typed_lines::<SynthesisVoice>(&lines).map_err(Into::into))
     }
 
     /// Receive a notification
@@ -817,14 +822,14 @@ impl<S: Read + Write + Source> Client<S> {
         let mut lines = Vec::new();
         receive_answer(&mut self.input, Some(&mut lines)).and_then(|status| {
             if lines.len() < 2 {
-                Err(Error::unexpected_eof("event truncated"))
+                Err(Error::Ssip(ssip::Error::UnexpectedEof("event truncated")))
             } else {
                 let message = &lines[0];
                 let client = &lines[1];
                 match status.code {
                     700 => {
                         if lines.len() != 3 {
-                            Err(Error::unexpected_eof("index markevent truncated"))
+                            Err(Error::Ssip(ssip::Error::UnexpectedEof("index markevent truncated")))
                         } else {
                             let mark = lines[3].to_owned();
                             Ok(Event::index_mark(mark, message, client))
@@ -835,7 +840,7 @@ impl<S: Read + Write + Source> Client<S> {
                     703 => Ok(Event::cancel(message, client)),
                     704 => Ok(Event::pause(message, client)),
                     705 => Ok(Event::resume(message, client)),
-                    _ => Err(Error::invalid_data("wrong status code for event")),
+                    _ => Err(Error::Ssip(ssip::Error::InvalidData("wrong status code for event"))),
                 }
             }
         })
@@ -844,7 +849,7 @@ impl<S: Read + Write + Source> Client<S> {
     /// Receive a list of client status from history.
     pub fn receive_history_clients(&mut self) -> ClientResult<Vec<HistoryClientStatus>> {
         self.receive_lines(OK_CLIENTS_LIST_SENT)
-            .and_then(|lines| parse_typed_lines::<HistoryClientStatus>(&lines))
+            .and_then(|lines| parse_typed_lines::<HistoryClientStatus>(&lines).map_err(Into::into))
     }
 
     /// Check the result of `set_client_name`.
@@ -884,8 +889,9 @@ pub fn receive_answer<W: BufRead + ?Sized>(
         match line.chars().nth(3) {
             Some(ch) => match ch {
                 ' ' => match line[0..3].parse::<u16>() {
-                    Ok(code) => return parse_status_line(code, line[4..].trim_end()),
-                    Err(err) => return Err(invalid_input!(err.to_string())),
+                    Ok(code) => return parse_status_line(code, line[4..].trim_end())
+                        .map_err(Into::into),
+                    Err(err) => return Err(invalid_input!(err.to_string().leak())),
                 },
                 '-' => match lines {
                     Some(ref mut lines) => lines.push(line[4..].trim_end().to_string()),
