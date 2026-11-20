@@ -21,7 +21,7 @@ async fn main() -> ClientResult<()> {
         .await?
         .check_receiving_data()
         .await?
-        .send_line("hello\r\n.")
+        .send_line("hello")
         .await?
         .receive_message_id()
         .await?;
@@ -44,7 +44,7 @@ async fn main() -> ClientResult<()> {
         .await?
         .check_receiving_data()
         .await?
-        .send_line("hello\r\n.")
+        .send_line("hello")
         .await?
         .receive_message_id()
         .await?;

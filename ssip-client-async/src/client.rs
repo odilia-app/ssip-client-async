@@ -11,8 +11,8 @@ use std::io::{self, Read, Write};
 
 use crate::constants::*;
 use crate::protocol::{
-    flush_lines, parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines,
-    write_lines,
+    data_lines, flush_lines, parse_event_id, parse_single_integer, parse_single_value,
+    parse_typed_lines,
 };
 use crate::types::*;
 
@@ -90,24 +90,18 @@ impl<S: Read + Write + Source> Client<S> {
     }
 
     /// Send lines of text (terminated by a single dot).
+    ///
+    /// Line breaks in the text start new lines and lines starting with a dot are escaped.
     pub fn send_lines(&mut self, lines: &[String]) -> ClientResult<&mut Self> {
-        const END_OF_DATA: [&str; 1] = ["."];
-        write_lines(
-            &mut self.output,
-            lines
-                .iter()
-                .map(|s| s.as_str())
-                .collect::<Vec<&str>>()
-                .as_slice(),
-        )?;
-        flush_lines(&mut self.output, &END_OF_DATA)?;
+        flush_lines(&mut self.output, &data_lines(lines))?;
         Ok(self)
     }
 
     /// Send one line of text (terminated by a single dot).
+    ///
+    /// Line breaks in the text start new lines and lines starting with a dot are escaped.
     pub fn send_line(&mut self, line: &str) -> ClientResult<&mut Self> {
-        const END_OF_DATA: &str = ".";
-        flush_lines(&mut self.output, &[line, END_OF_DATA])?;
+        flush_lines(&mut self.output, &data_lines(&[line]))?;
         Ok(self)
     }
 
@@ -724,24 +718,18 @@ impl<S: Read + Write + MioSource> MioClient<S> {
     }
 
     /// Send lines of text (terminated by a single dot).
+    ///
+    /// Line breaks in the text start new lines and lines starting with a dot are escaped.
     pub fn send_lines(&mut self, lines: &[String]) -> ClientResult<&mut Self> {
-        const END_OF_DATA: [&str; 1] = ["."];
-        write_lines(
-            &mut self.output,
-            lines
-                .iter()
-                .map(|s| s.as_str())
-                .collect::<Vec<&str>>()
-                .as_slice(),
-        )?;
-        flush_lines(&mut self.output, &END_OF_DATA)?;
+        flush_lines(&mut self.output, &data_lines(lines))?;
         Ok(self)
     }
 
     /// Send one line of text (terminated by a single dot).
+    ///
+    /// Line breaks in the text start new lines and lines starting with a dot are escaped.
     pub fn send_line(&mut self, line: &str) -> ClientResult<&mut Self> {
-        const END_OF_DATA: &str = ".";
-        flush_lines(&mut self.output, &[line, END_OF_DATA])?;
+        flush_lines(&mut self.output, &data_lines(&[line]))?;
         Ok(self)
     }
 
