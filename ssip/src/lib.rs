@@ -310,6 +310,7 @@ pub enum NotificationType {
     Cancel,
     Pause,
     Resume,
+    #[cfg_attr(feature = "serde", serde(rename = "index_marks"))]
     IndexMark,
     All,
 }
@@ -322,7 +323,7 @@ impl fmt::Display for NotificationType {
             NotificationType::Cancel => "cancel",
             NotificationType::Pause => "pause",
             NotificationType::Resume => "resume",
-            NotificationType::IndexMark => "index_mark",
+            NotificationType::IndexMark => "index_marks",
             NotificationType::All => "all",
         };
         f.write_str(s)
@@ -349,7 +350,7 @@ impl fmt::Display for EventType {
             EventType::Cancel => f.write_str("cancel"),
             EventType::Pause => f.write_str("pause"),
             EventType::Resume => f.write_str("resume"),
-            EventType::IndexMark(value) => write!(f, "index_mark({value})"),
+            EventType::IndexMark(value) => write!(f, "index_marks({value})"),
         }
     }
 }
@@ -845,7 +846,9 @@ mod tests {
     use std::io;
     use std::str::FromStr;
 
-    use super::{ClientError, HistoryClientStatus, HistoryPosition, MessageScope, SynthesisVoice};
+    use super::{
+        ClientError, EventType, HistoryClientStatus, HistoryPosition, MessageScope, SynthesisVoice,
+    };
 
     #[test]
     fn parse_synthesis_voice() {
@@ -904,5 +907,25 @@ mod tests {
                 Err(_) => panic!("expecting error 'unexpected EOF' parsing \"{line}\""),
             }
         }
+    }
+
+    #[test]
+    fn format_event_type_index_mark() {
+        assert_eq!(
+            "index_marks(mark1)",
+            format!("{}", EventType::IndexMark("mark1".to_string())).as_str()
+        );
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn deserialize_notification_type_index_mark() {
+        use super::NotificationType;
+        use serde::de::{value::Error, Deserialize, IntoDeserializer};
+        let deserializer = IntoDeserializer::<Error>::into_deserializer("index_marks");
+        assert_eq!(
+            NotificationType::IndexMark,
+            NotificationType::deserialize(deserializer).unwrap()
+        );
     }
 }

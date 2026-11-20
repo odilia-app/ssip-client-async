@@ -363,6 +363,15 @@ test_setter!(
     CapitalLettersRecognitionMode::Spell
 );
 
+test_setter!(
+    set_notification,
+    "SET self NOTIFICATION index_marks on\r\n",
+    "220 OK NOTIFICATION SET\r\n",
+    220,
+    NotificationType::IndexMark,
+    true
+);
+
 test_getter!(
     get_voice_type,
     "GET VOICE_TYPE\r\n",
