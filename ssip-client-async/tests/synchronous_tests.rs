@@ -147,6 +147,36 @@ fn say_one_line() -> ClientResult<()> {
     )
 }
 
+#[test]
+#[cfg(not(feature = "async-mio"))]
+fn say_lines_with_dots() -> ClientResult<()> {
+    test_client!(
+        &[
+            SET_CLIENT_COMMUNICATION,
+            ("SPEAK\r\n", "230 OK RECEIVING DATA\r\n"),
+            (
+                "Hello\r\n..\r\nQUIT\r\n..world\r\n.\r\n",
+                "225-21\r\n225 OK MESSAGE QUEUED\r\n",
+            ),
+        ],
+        |client| {
+            assert_eq!(
+                21,
+                client
+                    .speak()
+                    .unwrap()
+                    .check_status(OK_RECEIVING_DATA)
+                    .unwrap()
+                    .send_lines(&[String::from("Hello\r\n.\nQUIT"), String::from(".world")])
+                    .unwrap()
+                    .receive_message_id()
+                    .unwrap()
+            );
+            Ok(())
+        }
+    )
+}
+
 macro_rules! test_setter {
     ($setter:ident, $question:expr, $answer:expr, $code:expr, $($arg:tt)*) => {
         #[test]

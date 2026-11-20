@@ -9,7 +9,9 @@
 
 #[cfg(feature = "log")]
 use log::debug;
+use std::borrow::Cow;
 use std::io::{self, BufRead, Write};
+use std::iter;
 
 #[cfg(feature = "async-io")]
 use futures_lite::io::{AsyncBufReadExt as AsyncBufReadSmol, AsyncWriteExt as AsyncWriteSmol};
@@ -70,9 +72,45 @@ where
         .collect::<ClientResult<Vec<T>>>()
 }
 
+/// Convert text to the lines sent after SPEAK, including the terminating single dot.
+///
+/// Line breaks in the text start new lines and a leading dot is doubled, so that the text
+/// cannot end the message early or inject protocol lines.
+pub(crate) fn data_lines<S: AsRef<str>>(text: &[S]) -> Vec<Cow<'_, str>> {
+    const END_OF_DATA: &str = ".";
+    text.iter()
+        .flat_map(|s| s.as_ref().split("\r\n"))
+        .flat_map(|s| s.split(['\r', '\n']))
+        .map(|line| {
+            if line.starts_with('.') {
+                Cow::Owned(format!(".{line}"))
+            } else {
+                Cow::Borrowed(line)
+            }
+        })
+        .chain(iter::once(Cow::Borrowed(END_OF_DATA)))
+        .collect()
+}
+
+/// Check that no line contains a line break, which would send several protocol lines.
+fn check_lines<L: AsRef<str>>(lines: &[L]) -> ClientResult<()> {
+    match lines
+        .iter()
+        .map(AsRef::as_ref)
+        .find(|line| line.contains(['\r', '\n']))
+    {
+        Some(line) => Err(invalid_input!("line break in line: {:?}", line)),
+        None => Ok(()),
+    }
+}
+
 /// Write lines separated by CRLF.
-pub(crate) fn write_lines<W: Write + ?Sized>(output: &mut W, lines: &[&str]) -> ClientResult<()> {
-    for line in lines.iter() {
+pub(crate) fn write_lines<W: Write + ?Sized, L: AsRef<str>>(
+    output: &mut W,
+    lines: &[L],
+) -> ClientResult<()> {
+    check_lines(lines)?;
+    for line in lines.iter().map(AsRef::as_ref) {
         #[cfg(feature = "log")]
         debug!("SSIP(out): {line}");
         output.write_all(line.as_bytes())?;
@@ -83,11 +121,12 @@ pub(crate) fn write_lines<W: Write + ?Sized>(output: &mut W, lines: &[&str]) -> 
 
 /// Write lines (asyncronously) separated by CRLF.
 #[cfg(feature = "tokio")]
-pub(crate) async fn write_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
+pub(crate) async fn write_lines_tokio<W: AsyncWrite + Unpin + ?Sized, L: AsRef<str>>(
     output: &mut W,
-    lines: &[&str],
+    lines: &[L],
 ) -> ClientResult<()> {
-    for line in lines.iter() {
+    check_lines(lines)?;
+    for line in lines.iter().map(AsRef::as_ref) {
         #[cfg(feature = "log")]
         debug!("SSIP(out): {line}");
         output.write_all(line.as_bytes()).await?;
@@ -97,11 +136,12 @@ pub(crate) async fn write_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
 }
 /// Write lines (asyncronously) separated by CRLF.
 #[cfg(feature = "async-io")]
-pub(crate) async fn write_lines_smol<W: AsyncWriteSmol + Unpin + ?Sized>(
+pub(crate) async fn write_lines_smol<W: AsyncWriteSmol + Unpin + ?Sized, L: AsRef<str>>(
     output: &mut W,
-    lines: &[&str],
+    lines: &[L],
 ) -> ClientResult<()> {
-    for line in lines.iter() {
+    check_lines(lines)?;
+    for line in lines.iter().map(AsRef::as_ref) {
         #[cfg(feature = "log")]
         debug!("SSIP(out): {line}");
         output.write_all(line.as_bytes()).await?;
@@ -111,16 +151,19 @@ pub(crate) async fn write_lines_smol<W: AsyncWriteSmol + Unpin + ?Sized>(
 }
 
 /// Write lines separated by CRLF and flush the output.
-pub(crate) fn flush_lines<W: Write + ?Sized>(output: &mut W, lines: &[&str]) -> ClientResult<()> {
+pub(crate) fn flush_lines<W: Write + ?Sized, L: AsRef<str>>(
+    output: &mut W,
+    lines: &[L],
+) -> ClientResult<()> {
     write_lines(output, lines)?;
     output.flush()?;
     Ok(())
 }
 /// Write lines separated by CRLF and flush the output asyncronously.
 #[cfg(feature = "tokio")]
-pub(crate) async fn flush_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
+pub(crate) async fn flush_lines_tokio<W: AsyncWrite + Unpin + ?Sized, L: AsRef<str>>(
     output: &mut W,
-    lines: &[&str],
+    lines: &[L],
 ) -> ClientResult<()> {
     write_lines_tokio(output, lines).await?;
     output.flush().await?;
@@ -128,9 +171,9 @@ pub(crate) async fn flush_lines_tokio<W: AsyncWrite + Unpin + ?Sized>(
 }
 /// Write lines separated by CRLF and flush the output asyncronously.
 #[cfg(feature = "async-io")]
-pub(crate) async fn flush_lines_smol<W: AsyncWriteSmol + Unpin + ?Sized>(
+pub(crate) async fn flush_lines_smol<W: AsyncWriteSmol + Unpin + ?Sized, L: AsRef<str>>(
     output: &mut W,
-    lines: &[&str],
+    lines: &[L],
 ) -> ClientResult<()> {
     write_lines_smol(output, lines).await?;
     output.flush().await?;
@@ -249,7 +292,7 @@ pub(crate) fn receive_answer<W: BufRead + ?Sized>(
 #[cfg(test)]
 mod tests {
 
-    use std::io::BufReader;
+    use std::io::{self, BufReader};
 
     use super::{receive_answer, ClientError, ClientResult};
 
@@ -297,6 +340,41 @@ mod tests {
             vec!["afrikaans\taf\tnone", "en-rhotic\ten\tr"],
             lines.as_slice()
         );
+    }
+
+    #[test]
+    fn data_lines() {
+        assert_eq!(super::data_lines(&["Hello, world"]), ["Hello, world", "."]);
+        assert_eq!(super::data_lines(&[""]), ["", "."]);
+        assert_eq!(super::data_lines::<&str>(&[]), ["."]);
+    }
+
+    #[test]
+    fn data_lines_escape_leading_dot() {
+        assert_eq!(
+            super::data_lines(&[".", ".hidden", "...", "a.b"]),
+            ["..", "..hidden", "....", "a.b", "."]
+        );
+    }
+
+    #[test]
+    fn data_lines_split_line_breaks() {
+        assert_eq!(
+            super::data_lines(&["one\r\n.\r\nQUIT", "two\nthree\rfour\r\n"]),
+            ["one", "..", "QUIT", "two", "three", "four", "", "."]
+        );
+    }
+
+    #[test]
+    fn write_lines_rejects_line_breaks() {
+        let mut output = Vec::new();
+        for line in ["CHAR a\r\nQUIT", "CHAR a\nQUIT", "CHAR a\rQUIT"] {
+            assert!(matches!(
+                super::write_lines(&mut output, &["SPEAK", line]),
+                Err(ClientError::Io(err)) if err.kind() == io::ErrorKind::InvalidInput
+            ));
+        }
+        assert!(output.is_empty());
     }
 
     #[test]

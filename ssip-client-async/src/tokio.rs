@@ -9,8 +9,8 @@
 
 use crate::constants::*;
 use crate::protocol::{
-    flush_lines_tokio, parse_event_id, parse_single_integer, parse_single_value, parse_typed_lines,
-    write_lines_tokio,
+    data_lines, flush_lines_tokio, parse_event_id, parse_single_integer, parse_single_value,
+    parse_typed_lines,
 };
 use crate::types::*;
 
@@ -68,22 +68,18 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
         Self { input, output }
     }
     /// Send lines of text (terminated by a single dot).
+    ///
+    /// Line breaks in the text start new lines and lines starting with a dot are escaped.
     pub async fn send_lines(&mut self, lines: &[String]) -> ClientResult<&mut Self> {
-        const END_OF_DATA: [&str; 1] = ["."];
-        write_lines_tokio(
-            &mut self.output,
-            lines
-                .iter()
-                .map(|s| s.as_str())
-                .collect::<Vec<&str>>()
-                .as_slice(),
-        )
-        .await?;
-        flush_lines_tokio(&mut self.output, &END_OF_DATA).await?;
+        flush_lines_tokio(&mut self.output, &data_lines(lines)).await?;
         Ok(self)
     }
+    /// Send one line of text (terminated by a single dot).
+    ///
+    /// Line breaks in the text start new lines and lines starting with a dot are escaped.
     pub async fn send_line(&mut self, line: &str) -> ClientResult<&mut Self> {
-        self.send(Request::SendLine(line.to_string())).await
+        flush_lines_tokio(&mut self.output, &data_lines(&[line])).await?;
+        Ok(self)
     }
     /// Receive answer from server
     async fn receive_answer(&mut self, lines: Option<&mut Vec<String>>) -> ClientStatus {
@@ -178,7 +174,7 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
                 client_name.component
             ),
             Request::Speak => send_one_line!(self, "SPEAK"),
-            Request::SendLine(line) => send_one_line!(self, &line).map(|_| ()),
+            Request::SendLine(line) => self.send_line(&line).await.map(|_| ()),
             Request::SendLines(lines) => self.send_lines(&lines).await.map(|_| ()),
             Request::SpeakChar(ch) => send_one_line!(self, "CHAR {}", ch),
             Request::SpeakKey(key) => send_one_line!(self, "KEY {}", key),
@@ -726,5 +722,25 @@ impl<R: AsyncBufRead + Unpin, W: AsyncWrite + Unpin> AsyncClient<R, W> {
     /// Check if server accept data.
     pub async fn check_receiving_data(&mut self) -> ClientResult<&mut Self> {
         self.check_status(OK_RECEIVING_DATA).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AsyncClient;
+    use crate::types::{ClientResult, Request};
+
+    #[tokio::test]
+    async fn send_line_escapes_text() -> ClientResult<()> {
+        let mut client = AsyncClient::new(&b""[..], Vec::new());
+        client.send_line("Hello\n.\nQUIT").await?;
+        client
+            .send(Request::SendLine(String::from(".world")))
+            .await?;
+        assert_eq!(
+            b"Hello\r\n..\r\nQUIT\r\n.\r\n..world\r\n.\r\n",
+            client.output.as_slice()
+        );
+        Ok(())
     }
 }
